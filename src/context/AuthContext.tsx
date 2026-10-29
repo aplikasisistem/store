@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { UserAccount } from '../types';
 import { auth, db, initFirebaseService } from '../services/firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc, getDocFromCache, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, getDocFromCache, setDoc, onSnapshot } from 'firebase/firestore';
 
 interface AuthContextType {
   currentUser: UserAccount | null;
@@ -30,7 +30,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const [sessionRevokedMessage, setSessionRevokedMessage] = useState<string | null>(null);
 
-  // Background Cache-First Firestore Retrieval & Real-Time Sync
+  // Background Cache-First Firestore Retrieval & Real-Time Sync with Auto-Creation of Missing Docs
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
 
@@ -61,27 +61,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       })
       .catch(() => {
-        // Cache miss or offline fallback, rely on background server snapshot
+        // Cache miss, rely on server snapshot
       });
 
-    // Background onSnapshot listener
+    // Background onSnapshot listener with auto-creation if document is missing
     const unsubscribeSnapshot = onSnapshot(
       userDocRef,
       async (snapshot) => {
         if (!snapshot.exists()) {
-          if (auth) {
-            try {
-              await signOut(auth);
-            } catch {
-              // ignore
-            }
+          // Automatically create default document in Firestore if missing
+          const defaultProfile = {
+            id: currentUser.id,
+            email: currentUser.email,
+            name: currentUser.name,
+            role: currentUser.role,
+            status: 'active',
+            createdAt: currentUser.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          try {
+            await setDoc(userDocRef, defaultProfile, { merge: true });
+          } catch (err) {
+            console.warn('[AuthContext] Failed to auto-create missing user doc:', err);
           }
-          setCurrentUser(null);
-          localStorage.removeItem('pandir_current_user');
-          setSessionRevokedMessage('Profil pengguna tidak ditemukan di database.');
         } else {
           const data = snapshot.data() as Record<string, any>;
-          if (!data || data.status !== 'active') {
+          if (data && data.status === 'disabled') {
             if (auth) {
               try {
                 await signOut(auth);
@@ -91,7 +96,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
             setCurrentUser(null);
             localStorage.removeItem('pandir_current_user');
-            setSessionRevokedMessage('Profil pengguna tidak ditemukan di database.');
+            setSessionRevokedMessage('Akun Anda telah dinonaktifkan oleh Administrator.');
             return;
           }
 
@@ -161,10 +166,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setCurrentUser(instantUser);
       localStorage.setItem('pandir_current_user', JSON.stringify(instantUser));
 
-      // Asynchronously fetch full profile from Firestore in the background
-      getDoc(doc(firestoreDb, 'users', authUser.uid))
-        .then((docSnap) => {
-          if (docSnap.exists()) {
+      // Asynchronously fetch or auto-create profile from Firestore in the background
+      const userDocRef = doc(firestoreDb, 'users', authUser.uid);
+      getDoc(userDocRef)
+        .then(async (docSnap) => {
+          if (!docSnap.exists()) {
+            // Automatically create default document in Firestore if it doesn't exist
+            const defaultProfile = {
+              id: authUser.uid,
+              email: authUser.email || emailToAuth,
+              name: instantUser.name,
+              role: instantUser.role,
+              status: 'active',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            await setDoc(userDocRef, defaultProfile, { merge: true });
+          } else {
             const data = docSnap.data() as Record<string, any>;
             if (data && data.status === 'active') {
               const bgSuperAdmin = emailLower === 'pandir@pandirstore.com' || emailLower === 'admin@pandirstore.com' || data.role?.toLowerCase() === 'admin';
@@ -182,7 +200,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         })
         .catch(() => {
-          // Ignore background fetch errors to prevent blocking
+          // Ignore background fetch/creation errors to prevent blocking
         });
 
       return { success: true };
