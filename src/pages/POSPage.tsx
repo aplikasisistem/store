@@ -634,15 +634,14 @@ export const POSPage: React.FC = () => {
     }
 
     let addedCount = 0;
-    if (selectedVariantProduct.packagingVariants) {
-      selectedVariantProduct.packagingVariants.forEach((v) => {
-        const qty = variantQuantities[v.id] || 0;
-        if (qty > 0) {
-          handleAddToCart(selectedVariantProduct, v.name, qty, v.id, { silent: true });
-          addedCount += qty;
-        }
-      });
-    }
+    storage.getAvailableUnitsForProduct(selectedVariantProduct).forEach((opt) => {
+      const key = opt.variantId || opt.unit;
+      const qty = variantQuantities[key] || 0;
+      if (qty > 0) {
+        handleAddToCart(selectedVariantProduct, opt.unit, qty, opt.variantId, { silent: true });
+        addedCount += qty;
+      }
+    });
 
     if (customWeighableAmount > 0) {
       handleAddToCart(selectedVariantProduct, selectedVariantProduct.baseUnit, customWeighableAmount, undefined, { silent: true });
@@ -1954,12 +1953,29 @@ export const POSPage: React.FC = () => {
 
       {/* Packaging Variant Selection Modal */}
       {selectedVariantProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setSelectedVariantProduct(null);
+            if (e.key === 'Enter') handleAddVariantsToCart();
+            const keyNum = parseInt(e.key);
+            if (keyNum >= 1 && keyNum <= 9) {
+              const opts = storage.getAvailableUnitsForProduct(selectedVariantProduct);
+              const opt = opts[keyNum - 1];
+              if (opt) {
+                const key = opt.variantId || opt.unit;
+                const cur = variantQuantities[key] || 0;
+                setVariantQuantities({ ...variantQuantities, [key]: cur + 1 });
+              }
+            }
+          }}
+          tabIndex={0}
+        >
           <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
               <div>
                 <h3 className="font-black text-base">{selectedVariantProduct.name}</h3>
-                <p className="text-xs text-slate-400">Pilih Varian Kemasan / Eceran</p>
+                <p className="text-xs text-slate-400">Pilih Varian Kemasan / Eceran (Gunakan tombol angka 1-9)</p>
               </div>
               <button onClick={() => setSelectedVariantProduct(null)} className="text-slate-400 hover:text-white">✕</button>
             </div>
@@ -1972,29 +1988,34 @@ export const POSPage: React.FC = () => {
               )}
 
               <div className="space-y-2">
-                {selectedVariantProduct.packagingVariants?.map((v) => {
-                  const qty = variantQuantities[v.id] || 0;
+                {storage.getAvailableUnitsForProduct(selectedVariantProduct).map((opt, idx) => {
+                  const qty = variantQuantities[opt.variantId || opt.unit] || 0;
                   return (
-                    <div key={v.id} className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
-                      <div>
-                        <div className="font-bold text-slate-900 text-sm">{v.name}</div>
-                        <div className="text-xs text-emerald-700 font-semibold">
-                          Rp {v.sellingPrice.toLocaleString('id-ID')} &bull; Rasio: {v.ratioToBase} {selectedVariantProduct.baseUnit}
+                    <div key={opt.variantId || opt.unit} className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                          <span className="w-5 h-5 flex items-center justify-center bg-slate-200 rounded text-[10px] font-black">{idx + 1}</span>
+                          {opt.label}
+                        </div>
+                        <div className="text-xs text-emerald-700 font-semibold mt-0.5">
+                          Rp {opt.price.toLocaleString('id-ID')}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => {
-                            const cur = variantQuantities[v.id] || 0;
-                            setVariantQuantities({ ...variantQuantities, [v.id]: Math.max(0, cur - 1) });
+                            const key = opt.variantId || opt.unit;
+                            const cur = variantQuantities[key] || 0;
+                            setVariantQuantities({ ...variantQuantities, [key]: Math.max(0, cur - 1) });
                           }}
                           className="w-8 h-8 rounded-lg bg-white border border-slate-300 font-bold flex items-center justify-center"
                         >-</button>
                         <span className="w-8 text-center font-bold text-sm">{qty}</span>
                         <button
                           onClick={() => {
-                            const cur = variantQuantities[v.id] || 0;
-                            setVariantQuantities({ ...variantQuantities, [v.id]: cur + 1 });
+                            const key = opt.variantId || opt.unit;
+                            const cur = variantQuantities[key] || 0;
+                            setVariantQuantities({ ...variantQuantities, [key]: cur + 1 });
                           }}
                           className="w-8 h-8 rounded-lg bg-white border border-slate-300 font-bold flex items-center justify-center"
                         >+</button>

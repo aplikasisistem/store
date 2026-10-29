@@ -138,11 +138,23 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-      <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col max-h-[94vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs print:p-0 print:bg-white print:backdrop-blur-none print:items-start">
+      <style>{`
+        @media print {
+          @page { size: auto; margin: 0; }
+          body { margin: 0; }
+          .print-hidden { display: none !important; }
+          #printable-receipt {
+            margin: 0 auto;
+            page-break-inside: avoid;
+            width: 80mm;
+          }
+        }
+      `}</style>
+      <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col max-h-[94vh] print:shadow-none print:w-full print:max-w-none">
         
         {/* Top Dialog Bar */}
-        <div className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between shrink-0 print:hidden">
+        <div className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between shrink-0 print-hidden">
           <div className="flex items-center gap-2">
             <Printer className="w-4 h-4 text-emerald-400" />
             <h3 className="font-bold text-sm">Nota Belanja PANDIR STORE</h3>
@@ -156,7 +168,7 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({
         </div>
 
         {/* Bluetooth Connection Status Banner */}
-        <div className="bg-slate-100 px-4 py-2 border-b border-slate-200 flex items-center justify-between text-xs print:hidden">
+        <div className="bg-slate-100 px-4 py-2 border-b border-slate-200 flex items-center justify-between text-xs print-hidden">
           <div className="flex items-center gap-1.5">
             <Bluetooth className={`w-3.5 h-3.5 ${connectedDeviceName ? 'text-blue-600 animate-pulse' : 'text-slate-400'}`} />
             <span className="font-medium text-slate-700">
@@ -174,17 +186,17 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({
         </div>
 
         {actionStatus && (
-          <div className="bg-emerald-50 border-b border-emerald-200 text-emerald-800 px-4 py-1.5 text-xs font-bold flex items-center gap-1.5 print:hidden">
+          <div className="bg-emerald-50 border-b border-emerald-200 text-emerald-800 px-4 py-1.5 text-xs font-bold flex items-center gap-1.5 print-hidden">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{actionStatus}</span>
           </div>
         )}
 
         {/* Scrollable Receipt Preview (Printable Area) */}
-        <div className="p-4 sm:p-6 overflow-y-auto bg-slate-50 flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto bg-slate-50 flex-1 print:bg-white print:p-0 print:overflow-visible">
           <div
             id="printable-receipt"
-            className="p-4 shadow-xs rounded-xl border text-xs font-mono max-w-[80mm] mx-auto"
+            className="p-4 shadow-xs rounded-xl border text-xs font-mono max-w-[80mm] mx-auto print:border-none print:shadow-none print:p-0"
             style={{ 
               backgroundColor: '#ffffff', 
               color: '#000000', 
@@ -286,7 +298,7 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({
         </div>
 
         {/* 3 Primary Modal Footer Action Buttons */}
-        <div className="p-3 bg-white border-t border-slate-200 grid grid-cols-3 gap-2 shrink-0 print:hidden">
+        <div className="p-3 bg-white border-t border-slate-200 grid grid-cols-3 gap-2 shrink-0 print-hidden">
           <button
             onClick={onClose}
             className="py-2.5 px-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-bold transition text-center"

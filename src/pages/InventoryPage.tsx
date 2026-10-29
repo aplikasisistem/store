@@ -99,14 +99,17 @@ export const InventoryPage: React.FC = () => {
       category: categories[0] || 'Beras & Tepung',
       baseUnit: 'kg',
       isWeighable: true,
-      stock: 50,
+      id: `prod-${Date.now()}`,
+      code: `BRG-${(products.length + 1).toString().padStart(3, '0')}`,
+      name: '',
+      category: categories[0] || 'Beras & Tepung',
+      baseUnit: 'kg',
+      isWeighable: true,
+      stock: 0,
       minStockAlert: 10,
-      costBase: 12500,
-      priceBase: 15000,
-      hargaJualKg: 15000,
-      hargaJualGram500: 7500,
-      hargaJualGram250: 4000,
-      hargaJualGram100: 2000,
+      costBase: 0,
+      priceBase: 0,
+      hargaJualKg: 0,
       packagingVariants: [],
       tierConfig: {
         baseUnit: 'kg',
@@ -121,32 +124,21 @@ export const InventoryPage: React.FC = () => {
   const handleOpenEditProduct = (p: Product) => {
     setFormError(null);
     let initialType: 'kg' | 'box' | 'pcs' | 'liter' = 'pcs';
-    if (p.baseUnit === 'kg' || p.isWeighable || p.hargaJualKg) {
+    if (p.isWeighable || p.baseUnit === 'kg' || Boolean(p.hargaJualKg)) {
       initialType = 'kg';
     } else if (
       (p.rasioRencengPerDus && p.rasioPcsPerRenceng) ||
       p.tierConfig?.tier3Name === 'dus' ||
-      p.baseUnit === 'dus' ||
-      (p.tierConfig?.tier3Ratio && p.tierConfig.tier3Ratio > 1)
+      p.baseUnit === 'dus'
     ) {
       initialType = 'box';
-    } else if (p.baseUnit === 'liter' || p.baseUnit === 'botol') {
+    } else if (p.baseUnit === 'liter') {
       initialType = 'liter';
     } else {
       initialType = 'pcs';
     }
     setProductType(initialType);
-
-    const priceKg = p.hargaJualKg || p.priceBase || 15000;
-    const enrichedProduct: Product = {
-      ...p,
-      hargaJualKg: p.hargaJualKg || priceKg,
-      hargaJualGram500: p.hargaJualGram500 || Math.round(((priceKg * 0.5) / 100)) * 100,
-      hargaJualGram250: p.hargaJualGram250 || Math.round(((priceKg * 0.25) / 100)) * 100,
-      hargaJualGram100: p.hargaJualGram100 || Math.round(((priceKg * 0.1) / 100)) * 100,
-    };
-
-    setEditingProduct(enrichedProduct);
+    setEditingProduct(p);
     setIsEditModalOpen(true);
   };
 
@@ -155,83 +147,18 @@ export const InventoryPage: React.FC = () => {
     setProductType(type);
     if (!editingProduct) return;
 
-    if (type === 'kg') {
-      const priceKg = editingProduct.hargaJualKg || editingProduct.priceBase || 15000;
-      setEditingProduct({
-        ...editingProduct,
-        baseUnit: 'kg',
-        isWeighable: true,
-        stock: editingProduct.stock || 50,
-        costBase: editingProduct.costBase || 12500,
-        priceBase: priceKg,
-        hargaJualKg: priceKg,
-        hargaJualGram500: editingProduct.hargaJualGram500 || Math.round(((priceKg * 0.5) / 100)) * 100 || 7500,
-        hargaJualGram250: editingProduct.hargaJualGram250 || Math.round(((priceKg * 0.25) / 100)) * 100 || 4000,
-        hargaJualGram100: editingProduct.hargaJualGram100 || Math.round(((priceKg * 0.1) / 100)) * 100 || 2000,
-        tierConfig: {
-          ...editingProduct.tierConfig,
-          baseUnit: 'kg',
-        },
-      });
-    } else if (type === 'box') {
-      const rencengPerDus = editingProduct.rasioRencengPerDus || 48;
-      const pcsPerRenceng = editingProduct.rasioPcsPerRenceng || 12;
-      const totalRatio = rencengPerDus * pcsPerRenceng;
-      const boxSelling = editingProduct.hargaJualDus || editingProduct.tierConfig?.priceTier3 || (editingProduct.priceBase ? editingProduct.priceBase * totalRatio : 120000);
-      const boxCost = editingProduct.tierConfig?.costTier3 || (editingProduct.costBase ? editingProduct.costBase * totalRatio : 100000);
-      const rencengSelling = editingProduct.hargaJualRenceng || (editingProduct.tierConfig?.priceTier2 || Math.round((boxSelling / rencengPerDus) * 1.1 / 100) * 100 || 2800);
-      const pcsSelling = editingProduct.hargaJualPcs || editingProduct.priceBase || Math.round(boxSelling / totalRatio) || 300;
-      const unitCost = Math.round(boxCost / totalRatio);
+    // Reset base unit and flags
+    let baseUnit = 'pcs';
+    let isWeighable = false;
+    if (type === 'kg') { baseUnit = 'kg'; isWeighable = true; }
+    else if (type === 'liter') { baseUnit = 'liter'; }
 
-      // Default box quantity
-      const currentBoxQty = editingProduct.stock ? Math.floor(editingProduct.stock / totalRatio) : 50;
-
-      setEditingProduct({
-        ...editingProduct,
-        baseUnit: 'pcs',
-        isWeighable: false,
-        stock: currentBoxQty * totalRatio,
-        rasioRencengPerDus: rencengPerDus,
-        rasioPcsPerRenceng: pcsPerRenceng,
-        hargaJualDus: boxSelling,
-        hargaJualRenceng: rencengSelling,
-        hargaJualPcs: pcsSelling,
-        costBase: unitCost,
-        priceBase: pcsSelling,
-        tierConfig: {
-          ...editingProduct.tierConfig,
-          baseUnit: 'pcs',
-          tier2Name: 'renceng',
-          tier2Ratio: pcsPerRenceng,
-          priceTier2: rencengSelling,
-          costTier2: unitCost * pcsPerRenceng,
-          tier3Name: 'dus',
-          tier3Ratio: totalRatio,
-          costTier3: boxCost,
-          priceTier3: boxSelling,
-        },
-      });
-    } else if (type === 'liter') {
-      setEditingProduct({
-        ...editingProduct,
-        baseUnit: 'liter',
-        isWeighable: false,
-        tierConfig: {
-          ...editingProduct.tierConfig,
-          baseUnit: 'liter',
-        },
-      });
-    } else {
-      setEditingProduct({
-        ...editingProduct,
-        baseUnit: 'pcs',
-        isWeighable: false,
-        tierConfig: {
-          ...editingProduct.tierConfig,
-          baseUnit: 'pcs',
-        },
-      });
-    }
+    setEditingProduct({
+      ...editingProduct,
+      baseUnit,
+      isWeighable,
+      tierConfig: { ...editingProduct.tierConfig, baseUnit },
+    });
   };
 
   // Generate SKU Code Automatically
@@ -252,14 +179,6 @@ export const InventoryPage: React.FC = () => {
     }
     setFormError(null);
 
-    const isBoxType = productType === 'box' || Boolean(editingProduct.rasioRencengPerDus && editingProduct.rasioPcsPerRenceng);
-    const isKgType = productType === 'kg' || editingProduct.baseUnit === 'kg' || Boolean(editingProduct.hargaJualKg);
-    const effectivePriceBase = isBoxType && editingProduct.hargaJualPcs 
-      ? Number(editingProduct.hargaJualPcs) 
-      : isKgType && editingProduct.hargaJualKg
-      ? Number(editingProduct.hargaJualKg)
-      : Number(editingProduct.priceBase || 0);
-
     const prodToSave = {
       ...editingProduct,
       name: editingProduct.name.trim(),
@@ -267,18 +186,9 @@ export const InventoryPage: React.FC = () => {
       stock: Number(editingProduct.stock || 0),
       minStockAlert: Number(editingProduct.minStockAlert || 5),
       costBase: Number(editingProduct.costBase || 0),
-      priceBase: effectivePriceBase,
-      // 3-tier box
-      rasioRencengPerDus: isBoxType && editingProduct.rasioRencengPerDus ? Number(editingProduct.rasioRencengPerDus) : undefined,
-      rasioPcsPerRenceng: isBoxType && editingProduct.rasioPcsPerRenceng ? Number(editingProduct.rasioPcsPerRenceng) : undefined,
-      hargaJualDus: isBoxType && editingProduct.hargaJualDus ? Number(editingProduct.hargaJualDus) : undefined,
-      hargaJualRenceng: isBoxType && editingProduct.hargaJualRenceng ? Number(editingProduct.hargaJualRenceng) : undefined,
-      hargaJualPcs: isBoxType && editingProduct.hargaJualPcs ? Number(editingProduct.hargaJualPcs) : undefined,
-      // Multi-price weighted
-      hargaJualKg: isKgType && editingProduct.hargaJualKg ? Number(editingProduct.hargaJualKg) : (isBoxType ? undefined : editingProduct.hargaJualKg),
-      hargaJualGram500: isKgType && editingProduct.hargaJualGram500 ? Number(editingProduct.hargaJualGram500) : (isBoxType ? undefined : editingProduct.hargaJualGram500),
-      hargaJualGram250: isKgType && editingProduct.hargaJualGram250 ? Number(editingProduct.hargaJualGram250) : (isBoxType ? undefined : editingProduct.hargaJualGram250),
-      hargaJualGram100: isKgType && editingProduct.hargaJualGram100 ? Number(editingProduct.hargaJualGram100) : (isBoxType ? undefined : editingProduct.hargaJualGram100),
+      priceBase: Number(editingProduct.priceBase || 0),
+      // Ensure unit specific fields are kept based on type
+      hargaJualKg: productType === 'kg' ? Number(editingProduct.hargaJualKg || 0) : undefined,
       packagingVariants: editingProduct.packagingVariants || [],
     } as Product;
 
