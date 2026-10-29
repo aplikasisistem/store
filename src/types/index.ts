@@ -59,6 +59,7 @@ export interface Product {
   // Prices for base unit
   priceBase: number;
   costBase: number; // HPP / Modal per base unit
+  totalPurchaseCost?: number; // Total harga beli modal untuk seluruh stok masuk (faktur belanja grosir)
 
   // 3-Tier Multi-Unit Conversion (Box/Dus -> Strip/Renceng -> Pcs)
   rasioRencengPerDus?: number; // e.g. 48 Renceng per Dus

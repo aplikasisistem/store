@@ -608,7 +608,7 @@ export const POSPage: React.FC = () => {
     let totalNewBase = 0;
     if (selectedVariantProduct.packagingVariants) {
       selectedVariantProduct.packagingVariants.forEach((v) => {
-        const qty = variantQuantities[v.id] || 0;
+        const qty = variantQuantities[v.id] || (v.name ? variantQuantities[v.name] : 0) || 0;
         if (qty > 0) {
           totalNewBase += qty * v.ratioToBase;
         }
@@ -1074,276 +1074,215 @@ export const POSPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Product Catalog Grid with Arrow Key Highlight */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+          {/* Product Catalog Grid with Arrow Key Highlight & Uniform Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5">
             {filteredProducts.map((product, index) => {
               const isWeightedProduct = product.baseUnit === 'kg' || product.isWeighable || Boolean(product.hargaJualKg);
               const availableUnits = storage.getAvailableUnitsForProduct(product);
-              const defaultUnit = isWeightedProduct ? '1 KG' : product.baseUnit;
+              const defaultUnit = isWeightedProduct ? '1 KG' : (availableUnits[0]?.unit || product.baseUnit);
               const activeUnit = productSelectedUnits[product.id] || defaultUnit;
               const matchedUnitConfig = availableUnits.find(
-                (u) => u.unit.toLowerCase().replace(/\s+/g, '') === activeUnit.toLowerCase().replace(/\s+/g, '')
-              ) || availableUnits[0];
+                (u) => 
+                  (u.variantId && u.variantId === activeUnit) ||
+                  u.unit.toLowerCase().replace(/\s+/g, '') === activeUnit.toLowerCase().replace(/\s+/g, '')
+              ) || availableUnits[0] || {
+                unit: product.baseUnit,
+                ratio: 1,
+                price: product.priceBase || 0,
+                cost: product.costBase || 0,
+                label: product.baseUnit
+              };
 
+              const ratio = matchedUnitConfig.ratio > 0 ? matchedUnitConfig.ratio : 1;
+              const isWeighOrLiquid = product.baseUnit === 'kg' || product.isWeighable || product.baseUnit === 'liter';
+              const availableStockInActiveUnit = isWeighOrLiquid
+                ? Math.max(0, Math.round((product.stock / ratio) * 10) / 10)
+                : Math.max(0, Math.floor(product.stock / ratio));
+
+              const isOutOfStock = product.stock <= 0 || availableStockInActiveUnit <= 0;
               const isLowStock = product.stock <= product.minStockAlert && product.stock > 0;
-              const isOutOfStock = product.stock <= 0;
-              const customQty = customQuantities[product.id] ?? 0.5;
+              const customQty = customQuantities[product.id] ?? (product.baseUnit === 'kg' ? 0.5 : 1);
               const isHighlighted = index === highlightedIndex;
+              const isCustomInput = activeUnit.toLowerCase() === 'custom' || activeUnit.toLowerCase() === 'kg' || activeUnit.toLowerCase() === 'liter';
 
               return (
                 <div
                   key={product.id}
                   onClick={() => setHighlightedIndex(index)}
-                  className={`bg-white rounded-2xl border p-3 flex flex-col justify-between shadow-xs hover:shadow-md transition relative overflow-hidden cursor-pointer ${
+                  className={`bg-white rounded-2xl border p-3 sm:p-3.5 flex flex-col justify-between h-full shadow-xs hover:shadow-md transition-all relative overflow-hidden select-none cursor-pointer group ${
                     isHighlighted ? 'ring-2 ring-emerald-500 border-emerald-500 shadow-md bg-emerald-50/10' : ''
                   } ${
                     isOutOfStock
                       ? 'border-red-200 bg-red-50/20'
                       : isLowStock
-                      ? 'border-amber-200'
-                      : 'border-slate-200'
+                      ? 'border-amber-200 bg-amber-50/10'
+                      : 'border-slate-200/90 hover:border-emerald-300'
                   }`}
                 >
-                  {/* Stock Status Badge */}
-                  <div className="flex items-center justify-between gap-1 mb-1.5">
-                    <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                      {product.code}
-                    </span>
-                    {isOutOfStock ? (
-                      <span className="text-[10px] font-extrabold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
-                        Habis
-                      </span>
-                    ) : isLowStock ? (
-                      <span className="text-[10px] font-extrabold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
-                        Sisa {product.stock} {product.baseUnit}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
-                        Stok {product.stock} {product.baseUnit}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Product Name & Category */}
+                  {/* Card Top: SKU Code & Master Stock Status Pill */}
                   <div>
-                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight line-clamp-2 min-h-[2rem]">
-                      {product.name}
-                    </h4>
-                    <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-                      {product.category}
-                    </p>
-                  </div>
+                    <div className="flex items-center justify-between gap-1 mb-2">
+                      <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                        {product.code}
+                      </span>
+                      {isOutOfStock ? (
+                        <span className="text-[10px] font-black text-red-600 bg-red-100 px-2 py-0.5 rounded-full border border-red-200">
+                          Stok Habis
+                        </span>
+                      ) : isLowStock ? (
+                        <span className="text-[10px] font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                          Sisa {product.stock} {product.baseUnit}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          Stok: {product.stock} {product.baseUnit}
+                        </span>
+                      )}
+                    </div>
 
-                  {/* DEDICATED WEIGHTED ITEM SELECTOR: [ 1 KG | 500g | 250g | 100g | Custom ] */}
-                  {isWeightedProduct ? (
-                    <div className="my-2 space-y-2">
-                      <div className="space-y-1">
+                    {/* Product Name (Fixed Height for Perfect Visual Alignment) & Category */}
+                    <div className="mb-2.5">
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug line-clamp-2 h-10 group-hover:text-emerald-950 transition-colors">
+                        {product.name}
+                      </h4>
+                      <div className="flex items-center justify-between mt-1 text-[11px] text-slate-400 font-medium">
+                        <span className="truncate">{product.category}</span>
+                        {product.isWeighable && (
+                          <span className="text-[10px] text-emerald-700 bg-emerald-50 font-bold px-1.5 py-0.2 rounded border border-emerald-200 shrink-0">
+                            Timbangan
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Interactive Unit Selector: Direct Card Pills */}
+                    {availableUnits.length > 1 ? (
+                      <div className="mb-3 space-y-1">
                         <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold">
-                          <span>Paket Berat:</span>
-                          <span className="text-emerald-800 uppercase font-black">{activeUnit}</span>
+                          <span>Pilihan Satuan:</span>
+                          <span className="text-emerald-700 font-black uppercase">{matchedUnitConfig.unit}</span>
                         </div>
 
-                        {/* 5 Package Selector Buttons */}
-                        <div className="grid grid-cols-5 gap-0.5 p-0.5 bg-slate-100 rounded-lg border border-slate-200">
-                          {['1 KG', '500g', '250g', '100g', 'Custom'].map((pkg) => {
+                        {/* Responsive Segmented Unit Selector Grid */}
+                        <div className={`grid ${
+                          availableUnits.length === 2 ? 'grid-cols-2' :
+                          availableUnits.length === 3 ? 'grid-cols-3' :
+                          availableUnits.length === 4 ? 'grid-cols-4' :
+                          'grid-cols-3 sm:grid-cols-4'
+                        } gap-1 p-0.5 bg-slate-100/90 rounded-xl border border-slate-200/90`}>
+                          {availableUnits.map((u, uIdx) => {
                             const isSelected = 
-                              (activeUnit.toLowerCase() === pkg.toLowerCase()) || 
-                              (pkg === 'Custom' && (activeUnit.toLowerCase() === 'custom' || activeUnit.toLowerCase() === 'kg'));
+                              activeUnit === (u.variantId || u.unit) ||
+                              activeUnit.toLowerCase().replace(/\s+/g, '') === u.unit.toLowerCase().replace(/\s+/g, '');
                             return (
                               <button
-                                key={pkg}
+                                key={`${product.id}-${u.variantId || u.unit}-${uIdx}`}
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setProductSelectedUnits((prev) => ({
                                     ...prev,
-                                    [product.id]: pkg === 'Custom' ? 'kg' : pkg,
+                                    [product.id]: u.variantId || u.unit,
                                   }));
                                 }}
-                                className={`py-1 px-0.5 rounded text-[10px] font-black transition text-center ${
+                                className={`py-1.5 px-1 rounded-lg text-[10px] font-black transition text-center truncate ${
                                   isSelected
                                     ? 'bg-emerald-600 text-white shadow-xs'
-                                    : 'text-slate-600 hover:bg-slate-200'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
                                 }`}
+                                title={u.label}
                               >
-                                {pkg}
+                                {u.unit}
                               </button>
                             );
                           })}
                         </div>
                       </div>
+                    ) : (
+                      <div className="mb-3 flex items-center justify-between text-[11px] bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200/70">
+                        <span className="text-slate-500 font-semibold">Satuan Penjualan:</span>
+                        <span className="font-black text-slate-800 uppercase">{matchedUnitConfig.unit}</span>
+                      </div>
+                    )}
 
-                      {/* Displayed Price / Custom Weight Input */}
-                      {(activeUnit.toLowerCase() === 'custom' || activeUnit.toLowerCase() === 'kg') ? (
-                        <div className="bg-emerald-50/70 p-2 rounded-xl border border-emerald-200 space-y-1 text-xs">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-emerald-950">Berat Timbangan:</span>
-                            <span className="text-[10px] font-semibold text-slate-500">
-                              @ Rp {(product.hargaJualKg || product.priceBase).toLocaleString('id-ID')}/kg
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="number"
-                              step="0.05"
-                              min="0.05"
-                              value={customQty}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value) || 0;
-                                setCustomQuantities((prev) => ({ ...prev, [product.id]: val }));
-                              }}
-                              placeholder="0.5"
-                              className="w-full bg-white border border-emerald-300 rounded-lg px-2 py-1 text-xs font-bold text-center"
-                            />
-                            <span className="font-bold text-slate-700 text-xs">kg</span>
-                          </div>
-                          <div className="flex items-center justify-between text-[11px] pt-1 border-t border-emerald-200">
-                            <span className="text-slate-600 font-medium">Subtotal:</span>
-                            <span className="font-black text-emerald-800">
-                              Rp {Math.round(((product.hargaJualKg || product.priceBase) * customQty)).toLocaleString('id-ID')}
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-baseline justify-between pt-0.5">
-                          <span className="text-xs text-slate-500 font-medium">Harga:</span>
-                          <div className="text-right">
-                            <span className="text-sm font-black text-emerald-700">
-                              Rp {matchedUnitConfig.price.toLocaleString('id-ID')}
-                            </span>
-                            <span className="text-[10px] text-slate-400 block font-normal">
-                              / {matchedUnitConfig.unit}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Add To Cart Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const isCustom = activeUnit.toLowerCase() === 'custom' || activeUnit.toLowerCase() === 'kg';
-                          const qtyToAdd = isCustom ? customQty : 1;
-                          const unitToAdd = isCustom ? 'kg' : activeUnit;
-                          handleAddToCart(product, unitToAdd, qtyToAdd);
-                        }}
-                        disabled={isOutOfStock}
-                        className={`w-full py-2 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95 ${
-                          isOutOfStock
-                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                            : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                        }`}
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>+ Keranjang ({activeUnit.toLowerCase() === 'custom' || activeUnit.toLowerCase() === 'kg' ? `${customQty} kg` : activeUnit})</span>
-                      </button>
-                    </div>
-                  ) : product.packagingVariants && product.packagingVariants.length > 0 ? (
-                    <div className="my-2.5 space-y-2">
-                      <div className="text-[11px] font-bold text-amber-900 bg-amber-50/80 p-2 rounded-xl border border-amber-200">
-                        <div className="flex items-center justify-between text-amber-800 mb-1 text-[10px]">
-                          <span className="flex items-center gap-1 font-extrabold">
-                            <Package className="w-3 h-3 text-amber-600" />
-                            {product.packagingVariants.length} Varian Kemasan
+                    {/* Custom Weighable / Liter Decimal Input */}
+                    {isCustomInput && (
+                      <div className="mb-3 bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200 space-y-1.5 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-emerald-950">
+                            Input Jumlah ({product.baseUnit}):
                           </span>
-                          <span className="text-emerald-700 font-black">
-                            Mulai Rp {Math.min(...product.packagingVariants.map((v) => v.sellingPrice)).toLocaleString('id-ID')}
+                          <span className="text-[10px] font-semibold text-slate-500">
+                            @ Rp {(product.hargaJualKg || product.priceBase || 0).toLocaleString('id-ID')}/{product.baseUnit}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            step={product.baseUnit === 'kg' ? '0.05' : '0.1'}
+                            min="0.05"
+                            value={customQty}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setCustomQuantities((prev) => ({ ...prev, [product.id]: val }));
+                            }}
+                            className="w-full bg-white border border-emerald-300 rounded-lg px-2.5 py-1 text-xs font-bold text-center focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                          />
+                          <span className="font-black text-slate-700 text-xs uppercase">{product.baseUnit}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-emerald-200">
+                          <span className="text-slate-600 font-medium">Perkiraan:</span>
+                          <span className="font-black text-emerald-800">
+                            Rp {Math.round((product.hargaJualKg || product.priceBase || 0) * customQty).toLocaleString('id-ID')}
                           </span>
                         </div>
                       </div>
+                    )}
+                  </div>
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenVariantModal(product);
-                        }}
-                        disabled={isOutOfStock}
-                        className={`w-full py-2.5 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95 shadow-xs ${
-                          isOutOfStock
-                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                            : 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20'
-                        }`}
-                      >
-                        <Package className="w-3.5 h-3.5" />
-                        <span>Pilih Kemasan Eceran</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="my-2 space-y-2">
-                      {/* Interactive Unit Selector [ Dus | Renceng | Pcs ] */}
-                      {availableUnits.length > 1 ? (
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold">
-                            <span>Pilih Satuan Jual:</span>
-                            <span className="text-emerald-800 uppercase font-black">{activeUnit}</span>
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-1 p-0.5 bg-slate-100/90 rounded-lg border border-slate-200">
-                            {availableUnits.map((u) => {
-                              const isSelected = activeUnit.toLowerCase() === u.unit.toLowerCase();
-                              return (
-                                <button
-                                  key={u.unit}
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setProductSelectedUnits((prev) => ({
-                                      ...prev,
-                                      [product.id]: u.unit,
-                                    }));
-                                  }}
-                                  className={`py-1 px-1 rounded-md text-[10px] font-black transition capitalize text-center ${
-                                    isSelected
-                                      ? 'bg-emerald-600 text-white shadow-xs'
-                                      : 'text-slate-600 hover:bg-slate-200'
-                                  }`}
-                                  title={`${u.label}`}
-                                >
-                                  {u.unit}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-slate-500 font-semibold">Satuan:</span>
-                          <span className="text-xs font-bold text-slate-800 uppercase">{activeUnit}</span>
-                        </div>
-                      )}
-
-                      {/* Displayed Price for Active Unit */}
-                      <div className="flex items-baseline justify-between pt-0.5">
-                        <span className="text-xs text-slate-500 font-medium">Harga:</span>
-                        <div className="text-right">
-                          <span className="text-sm font-black text-emerald-700">
-                            Rp {matchedUnitConfig.price.toLocaleString('id-ID')}
-                          </span>
-                          <span className="text-[10px] text-slate-400 block font-normal">
-                            / {matchedUnitConfig.unit} {matchedUnitConfig.ratio > 1 ? `(${matchedUnitConfig.ratio} pcs)` : ''}
-                          </span>
+                  {/* Card Bottom: Price, Stock In Selected Unit & Action Button */}
+                  <div className="mt-auto pt-2 border-t border-slate-100">
+                    <div className="flex items-baseline justify-between mb-2">
+                      <div>
+                        <span className="text-xs text-slate-400 font-semibold block">Harga Jual:</span>
+                        <div className="text-sm sm:text-base font-black text-emerald-700 leading-none">
+                          Rp {matchedUnitConfig.price.toLocaleString('id-ID')}
                         </div>
                       </div>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddToCart(product, activeUnit, 1);
-                        }}
-                        disabled={isOutOfStock}
-                        className={`w-full py-2 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95 ${
-                          isOutOfStock
-                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                            : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                        }`}
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>+ Keranjang ({activeUnit})</span>
-                      </button>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block font-medium">
+                          /{matchedUnitConfig.unit}
+                        </span>
+                        <span className={`text-[10px] font-bold ${
+                          isOutOfStock ? 'text-red-500' : 'text-slate-500'
+                        }`}>
+                          {isOutOfStock ? 'Habis' : `Tersedia: ${availableStockInActiveUnit} ${matchedUnitConfig.unit}`}
+                        </span>
+                      </div>
                     </div>
-                  )}
+
+                    {/* + Keranjang Button (Uniform & Aligned at bottom of every card) */}
+                    <button
+                      type="button"
+                      disabled={isOutOfStock}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const isCustom = activeUnit.toLowerCase() === 'custom' || activeUnit.toLowerCase() === 'kg' || activeUnit.toLowerCase() === 'liter';
+                        const qtyToAdd = isCustom ? customQty : 1;
+                        const unitToAdd = isCustom ? product.baseUnit : matchedUnitConfig.unit;
+                        handleAddToCart(product, unitToAdd, qtyToAdd, matchedUnitConfig.variantId);
+                      }}
+                      className={`w-full py-2.5 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95 shadow-xs ${
+                        isOutOfStock
+                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+                      }`}
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                      <span>+ Keranjang ({activeUnit.toLowerCase() === 'custom' ? `${customQty} ${product.baseUnit}` : matchedUnitConfig.unit})</span>
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -1472,7 +1411,7 @@ export const POSPage: React.FC = () => {
                               (pkg === 'Custom' && isCustomKg);
                             return (
                               <button
-                                key={pkg}
+                                key={`${item.productId}-${pkg}`}
                                 type="button"
                                 onClick={() => handleChangeCartItemPackage(item, pkg)}
                                 className={`py-0.5 px-0.5 rounded text-[10px] font-black transition text-center ${
@@ -1991,7 +1930,7 @@ export const POSPage: React.FC = () => {
                 {storage.getAvailableUnitsForProduct(selectedVariantProduct).map((opt, idx) => {
                   const qty = variantQuantities[opt.variantId || opt.unit] || 0;
                   return (
-                    <div key={opt.variantId || opt.unit} className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <div key={`${selectedVariantProduct.id}-${opt.variantId || opt.unit}-${idx}`} className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
                       <div className="flex-1">
                         <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
                           <span className="w-5 h-5 flex items-center justify-center bg-slate-200 rounded text-[10px] font-black">{idx + 1}</span>

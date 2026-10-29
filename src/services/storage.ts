@@ -446,47 +446,84 @@ class StorageService {
       isVariant?: boolean;
     }[] = [];
 
-    // 3-Tier Multi-Unit Conversion (Dus -> Renceng -> Pcs)
+    // 1. Centralized Retail Packaging Variants (e.g. Dus, Renceng, Pcs or 100g, 250g, 500g, 1kg)
+    if (product.packagingVariants && product.packagingVariants.length > 0) {
+      product.packagingVariants.forEach((v) => {
+        const ratio = v.ratioToBase > 0 ? v.ratioToBase : 1;
+        const cost = v.costPrice || Math.round((product.costBase || 0) * ratio);
+        options.push({
+          unit: v.name,
+          ratio: ratio,
+          price: v.sellingPrice || 0,
+          cost: cost,
+          label: `${v.name} (Rp ${(v.sellingPrice || 0).toLocaleString('id-ID')})`,
+          variantId: v.id,
+          variantName: v.name,
+          isVariant: true,
+        });
+      });
+
+      // If master base unit is not represented in variants and has a valid priceBase, add it as well
+      const hasBase = options.some(
+        (o) => Math.abs(o.ratio - 1) < 0.0001 || o.unit.toLowerCase() === product.baseUnit.toLowerCase()
+      );
+      if (!hasBase && (product.priceBase || 0) > 0) {
+        options.push({
+          unit: product.baseUnit,
+          ratio: 1,
+          price: product.priceBase || 0,
+          cost: product.costBase || 0,
+          label: `${product.baseUnit.toUpperCase()} (Rp ${(product.priceBase || 0).toLocaleString('id-ID')})`,
+        });
+      }
+
+      return options;
+    }
+
+    // 2. 3-Tier Multi-Unit Conversion (Dus -> Renceng -> Pcs) - Legacy Support
     if (product.rasioRencengPerDus && product.rasioPcsPerRenceng) {
       const rencengRatio = product.rasioPcsPerRenceng;
       const totalPcsPerDus = product.rasioRencengPerDus * product.rasioPcsPerRenceng;
       
-      const pricePcs = product.hargaJualPcs ?? product.priceBase;
-      const priceRenceng = product.hargaJualRenceng ?? (product.tierConfig?.priceTier2 || pricePcs * rencengRatio);
-      const priceDus = product.hargaJualDus ?? (product.tierConfig?.priceTier3 || pricePcs * totalPcsPerDus);
+      const pricePcs = product.hargaJualPcs || product.priceBase || 0;
+      const priceRenceng = product.hargaJualRenceng || Math.round(pricePcs * rencengRatio);
+      const priceDus = product.hargaJualDus || Math.round(pricePcs * totalPcsPerDus);
 
-      const costPcs = product.costBase;
-      const costRenceng = product.costBase * rencengRatio;
-      const costDus = product.costBase * totalPcsPerDus;
-
-      return [
-        {
-          unit: 'pcs',
-          ratio: 1,
-          price: pricePcs,
-          cost: costPcs,
-          label: `Pcs (Eceran: Rp ${pricePcs.toLocaleString('id-ID')})`,
-        },
-        {
-          unit: 'renceng',
-          ratio: rencengRatio,
-          price: priceRenceng,
-          cost: costRenceng,
-          label: `Renceng (Isi ${rencengRatio} Pcs: Rp ${priceRenceng.toLocaleString('id-ID')})`,
-        },
-        {
+      if (priceDus > 0) {
+        options.push({
           unit: 'dus',
           ratio: totalPcsPerDus,
           price: priceDus,
-          cost: costDus,
-          label: `Dus (Isi ${product.rasioRencengPerDus} Renceng = ${totalPcsPerDus} Pcs: Rp ${priceDus.toLocaleString('id-ID')})`,
-        },
-      ];
+          cost: (product.costBase || 0) * totalPcsPerDus,
+          label: `Dus (${totalPcsPerDus} Pcs: Rp ${priceDus.toLocaleString('id-ID')})`,
+        });
+      }
+      if (priceRenceng > 0) {
+        options.push({
+          unit: 'renceng',
+          ratio: rencengRatio,
+          price: priceRenceng,
+          cost: (product.costBase || 0) * rencengRatio,
+          label: `Renceng (${rencengRatio} Pcs: Rp ${priceRenceng.toLocaleString('id-ID')})`,
+        });
+      }
+      if (pricePcs > 0 || options.length === 0) {
+        options.push({
+          unit: 'pcs',
+          ratio: 1,
+          price: pricePcs,
+          cost: product.costBase || 0,
+          label: `Pcs (Rp ${pricePcs.toLocaleString('id-ID')})`,
+        });
+      }
+      if (options.length > 0) {
+        return options;
+      }
     }
 
-    // Multi-Price Variants & Conversion for Weighted Items (KG / Grams)
+    // 3. Multi-Price Variants & Conversion for Weighted Items (KG / Grams)
     if (product.baseUnit === 'kg' || product.isWeighable || product.hargaJualKg) {
-      const priceKg = product.hargaJualKg ?? product.priceBase;
+      const priceKg = product.hargaJualKg ?? product.priceBase ?? 0;
       const price500 = product.hargaJualGram500 ?? Math.round((priceKg * 0.5) / 100) * 100;
       const price250 = product.hargaJualGram250 ?? Math.round((priceKg * 0.25) / 100) * 100;
       const price100 = product.hargaJualGram100 ?? Math.round((priceKg * 0.1) / 100) * 100;
@@ -504,21 +541,21 @@ class StorageService {
           unit: '500g',
           ratio: 0.5,
           price: price500,
-          cost: costKg * 0.5,
+          cost: Math.round(costKg * 0.5),
           label: `500g (Rp ${price500.toLocaleString('id-ID')})`,
         },
         {
           unit: '250g',
           ratio: 0.25,
           price: price250,
-          cost: costKg * 0.25,
+          cost: Math.round(costKg * 0.25),
           label: `250g (Rp ${price250.toLocaleString('id-ID')})`,
         },
         {
           unit: '100g',
           ratio: 0.1,
           price: price100,
-          cost: costKg * 0.1,
+          cost: Math.round(costKg * 0.1),
           label: `100g (Rp ${price100.toLocaleString('id-ID')})`,
         },
         {
@@ -547,37 +584,61 @@ class StorageService {
       return kgOptions;
     }
 
-    // Base unit (Master Unit)
+    // 4. Multi-Price Variants & Conversion for Liquid / Liter Items
+    if (product.baseUnit === 'liter') {
+      const priceL = product.priceBase || 0;
+      const costL = product.costBase || 0;
+      const price500 = Math.round((priceL * 0.5) / 100) * 100;
+      const price250 = Math.round((priceL * 0.25) / 100) * 100;
+
+      const literOptions = [
+        {
+          unit: '1 Liter',
+          ratio: 1.0,
+          price: priceL,
+          cost: costL,
+          label: `1 Liter (Rp ${priceL.toLocaleString('id-ID')})`,
+        },
+        {
+          unit: '500 ml',
+          ratio: 0.5,
+          price: price500,
+          cost: Math.round(costL * 0.5),
+          label: `500 ml (Rp ${price500.toLocaleString('id-ID')})`,
+        },
+        {
+          unit: '250 ml',
+          ratio: 0.25,
+          price: price250,
+          cost: Math.round(costL * 0.25),
+          label: `250 ml (Rp ${price250.toLocaleString('id-ID')})`,
+        },
+        {
+          unit: 'liter',
+          ratio: 1.0,
+          price: priceL,
+          cost: costL,
+          label: `Custom Liter (Rp ${priceL.toLocaleString('id-ID')}/L)`,
+        },
+      ];
+
+      return literOptions;
+    }
+
+    // 5. Default Base Unit (Master Unit: PCS / Bungkus / Saset / etc.)
     options.push({
       unit: product.baseUnit,
       ratio: 1,
-      price: product.priceBase,
-      cost: product.costBase,
-      label: `${product.baseUnit.toUpperCase()} (Eceran: Rp ${product.priceBase.toLocaleString('id-ID')})`,
+      price: product.priceBase || 0,
+      cost: product.costBase || 0,
+      label: `${product.baseUnit.toUpperCase()} (Rp ${(product.priceBase || 0).toLocaleString('id-ID')})`,
     });
-
-    // Centralized Retail Packaging Variants (e.g. 100g, 1/4 kg, 1/2 kg, 1 kg)
-    if (product.packagingVariants && product.packagingVariants.length > 0) {
-      product.packagingVariants.forEach((v) => {
-        const cost = v.costPrice || Math.round(product.costBase * v.ratioToBase);
-        options.push({
-          unit: v.name,
-          ratio: v.ratioToBase,
-          price: v.sellingPrice,
-          cost: cost,
-          label: `${v.name} (Rp ${v.sellingPrice.toLocaleString('id-ID')})`,
-          variantId: v.id,
-          variantName: v.name,
-          isVariant: true,
-        });
-      });
-    }
 
     // Tier 2 (Renteng / Grosir Kecil)
     if (product.tierConfig?.tier2Name && product.tierConfig?.tier2Ratio) {
       const ratio = product.tierConfig.tier2Ratio;
-      const price = product.tierConfig.priceTier2 || product.priceBase * ratio;
-      const cost = product.tierConfig.costTier2 || product.costBase * ratio;
+      const price = product.tierConfig.priceTier2 || (product.priceBase || 0) * ratio;
+      const cost = product.tierConfig.costTier2 || (product.costBase || 0) * ratio;
       options.push({
         unit: product.tierConfig.tier2Name,
         ratio: ratio,
@@ -590,8 +651,8 @@ class StorageService {
     // Tier 3 (Dus / Karung / Peti)
     if (product.tierConfig?.tier3Name && product.tierConfig?.tier3Ratio) {
       const ratio = product.tierConfig.tier3Ratio;
-      const price = product.tierConfig.priceTier3 || product.priceBase * ratio;
-      const cost = product.tierConfig.costTier3 || product.costBase * ratio;
+      const price = product.tierConfig.priceTier3 || (product.priceBase || 0) * ratio;
+      const cost = product.tierConfig.costTier3 || (product.costBase || 0) * ratio;
       options.push({
         unit: product.tierConfig.tier3Name,
         ratio: ratio,
@@ -601,7 +662,14 @@ class StorageService {
       });
     }
 
-    return options;
+    // Deduplicate options by unit name (case-insensitive) or variantId
+    const seen = new Set<string>();
+    return options.filter((opt) => {
+      const key = (opt.variantId || opt.unit).toLowerCase().trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   /**
@@ -622,15 +690,24 @@ class StorageService {
       if (selNorm === unitNorm) return true;
       if (u.variantId && u.variantId.toLowerCase() === selNorm) return true;
       if ((selNorm === '1kg' || selNorm === 'kg') && (unitNorm === '1kg' || unitNorm === 'kg')) return true;
+      if ((selNorm === '1liter' || selNorm === 'liter') && (unitNorm === '1liter' || unitNorm === 'liter')) return true;
       return false;
-    }) || available[0];
+    }) || available[0] || {
+      unit: product.baseUnit,
+      ratio: 1,
+      price: product.priceBase || 0,
+      cost: product.costBase || 0,
+      label: product.baseUnit,
+    };
 
-    const unitMultiplier = matched.ratio;
-    const unitPrice = matched.price;
-    const costPrice = matched.cost;
-    const baseQuantity = Math.round((quantity * unitMultiplier) * 10000) / 10000;
-    const subtotal = Math.max(0, unitPrice * quantity - discount);
-    const totalCost = costPrice * quantity;
+    const safeQty = isNaN(quantity) || quantity <= 0 ? 1 : quantity;
+    const safeDiscount = isNaN(discount) || discount < 0 ? 0 : discount;
+    const unitMultiplier = matched.ratio > 0 ? matched.ratio : 1;
+    const unitPrice = isNaN(matched.price) ? 0 : matched.price;
+    const costPrice = isNaN(matched.cost) ? 0 : matched.cost;
+    const baseQuantity = Math.round((safeQty * unitMultiplier) * 10000) / 10000;
+    const subtotal = Math.max(0, Math.round(unitPrice * safeQty - safeDiscount));
+    const totalCost = Math.round(costPrice * safeQty);
 
     return {
       productId: product.id,
