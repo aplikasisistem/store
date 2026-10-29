@@ -14,7 +14,7 @@ import {
   onSnapshot, 
   Unsubscribe 
 } from 'firebase/firestore';
-import { getAuth, Auth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { getAuth, Auth, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { UserAccount } from '../types';
 
 export interface FirebaseConfig {
@@ -79,6 +79,7 @@ export function initFirebaseService(): {
 
     firestoreDb = getFirestore(firebaseApp);
     firebaseAuth = getAuth(firebaseApp);
+    setPersistence(firebaseAuth, browserLocalPersistence).catch(() => {});
 
     if (!isFirestoreInitialized && typeof window !== 'undefined') {
       isFirestoreInitialized = true;
@@ -97,6 +98,10 @@ export function initFirebaseService(): {
     return { isConfigured: false, db: null, auth: null };
   }
 }
+
+const initialFirebaseInit = initFirebaseService();
+export const db = initialFirebaseInit.db;
+export const auth = initialFirebaseInit.auth;
 
 /**
  * Real-time Document Listener with automatic fallback

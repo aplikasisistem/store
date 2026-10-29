@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UserAccount } from '../types';
-import { storage } from '../services/storage';
-import { listenToDocument, loginWithFirebase } from '../services/firebase';
+import { auth, db, initFirebaseService } from '../services/firebase';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, getDoc, getDocFromCache, onSnapshot } from 'firebase/firestore';
 
 interface AuthContextType {
   currentUser: UserAccount | null;
@@ -29,55 +30,175 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const [sessionRevokedMessage, setSessionRevokedMessage] = useState<string | null>(null);
 
-  // Monitor the logged in user in real-time across tabs / Firebase
+  // Background Cache-First Firestore Retrieval & Real-Time Sync
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.id) return;
 
-    const unsubscribe = listenToDocument<UserAccount>('users', currentUser.id, (updated) => {
-      // Only logout if the document explicitly exists and its status is set to 'disabled' by Admin
-      if (updated && updated.status === 'disabled') {
-        logout('Akun Anda telah dinonaktifkan atau dihapus oleh Admin.');
-      } else if (updated && updated.status === 'active') {
-        // Update user state if name, role, or other fields changed
-        setCurrentUser(updated);
-        localStorage.setItem('pandir_current_user', JSON.stringify(updated));
+    const { isConfigured, db: firestoreDb } = initFirebaseService();
+    if (!isConfigured || !firestoreDb) return;
+
+    const userDocRef = doc(firestoreDb, 'users', currentUser.id);
+
+    // Try cache first asynchronously
+    getDocFromCache(userDocRef)
+      .then((cacheSnap) => {
+        if (cacheSnap.exists()) {
+          const data = cacheSnap.data() as Record<string, any>;
+          if (data && data.status === 'active') {
+            const emailLower = (data.email || currentUser.email || '').toLowerCase();
+            const isSuperAdmin = emailLower === 'pandir@pandirstore.com' || emailLower === 'admin@pandirstore.com' || data.role?.toLowerCase() === 'admin';
+            const updated: UserAccount = {
+              id: cacheSnap.id,
+              email: data.email || currentUser.email,
+              name: data.name || currentUser.name,
+              role: isSuperAdmin ? 'admin' : (data.role || 'kasir'),
+              status: 'active',
+              createdAt: data.createdAt || currentUser.createdAt,
+            };
+            setCurrentUser(updated);
+            localStorage.setItem('pandir_current_user', JSON.stringify(updated));
+          }
+        }
+      })
+      .catch(() => {
+        // Cache miss or offline fallback, rely on background server snapshot
+      });
+
+    // Background onSnapshot listener
+    const unsubscribeSnapshot = onSnapshot(
+      userDocRef,
+      async (snapshot) => {
+        if (!snapshot.exists()) {
+          if (auth) {
+            try {
+              await signOut(auth);
+            } catch {
+              // ignore
+            }
+          }
+          setCurrentUser(null);
+          localStorage.removeItem('pandir_current_user');
+          setSessionRevokedMessage('Profil pengguna tidak ditemukan di database.');
+        } else {
+          const data = snapshot.data() as Record<string, any>;
+          if (!data || data.status !== 'active') {
+            if (auth) {
+              try {
+                await signOut(auth);
+              } catch {
+                // ignore
+              }
+            }
+            setCurrentUser(null);
+            localStorage.removeItem('pandir_current_user');
+            setSessionRevokedMessage('Profil pengguna tidak ditemukan di database.');
+            return;
+          }
+
+          const emailLower = (data.email || currentUser.email || '').toLowerCase();
+          const isSuperAdmin = emailLower === 'pandir@pandirstore.com' || emailLower === 'admin@pandirstore.com' || data.role?.toLowerCase() === 'admin';
+
+          const updatedUser: UserAccount = {
+            id: snapshot.id,
+            email: data.email || currentUser.email,
+            name: data.name || currentUser.name,
+            role: isSuperAdmin ? 'admin' : (data.role || 'kasir'),
+            status: data.status || 'active',
+            createdAt: data.createdAt || currentUser.createdAt,
+          };
+          setCurrentUser(updatedUser);
+          localStorage.setItem('pandir_current_user', JSON.stringify(updatedUser));
+        }
+      },
+      (error) => {
+        console.warn('[AuthContext] background snapshot error:', error);
       }
-    });
-
-    // Also listen to internal user update custom events
-    const handleLocalUpdate = () => {
-      const freshUsers = storage.getUsers();
-      const matched = freshUsers.find((u) => u.id === currentUser.id);
-      if (matched && matched.status === 'disabled') {
-        logout('Akun Anda telah dinonaktifkan atau dihapus oleh Admin.');
-      } else if (matched && matched.status === 'active') {
-        setCurrentUser(matched);
-        localStorage.setItem('pandir_current_user', JSON.stringify(matched));
-      }
-    };
-
-    window.addEventListener('pandir_data_updated', handleLocalUpdate);
+    );
 
     return () => {
-      unsubscribe();
-      window.removeEventListener('pandir_data_updated', handleLocalUpdate);
+      unsubscribeSnapshot();
     };
   }, [currentUser?.id]);
 
   const login = async (identifier: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     setSessionRevokedMessage(null);
+    const cleanId = identifier.trim().toLowerCase();
+    const emailToAuth = cleanId.includes('@') ? cleanId : `${cleanId}@pandirstore.com`;
+
     try {
-      const user = await loginWithFirebase(identifier, pass);
-      setCurrentUser(user);
-      localStorage.setItem('pandir_current_user', JSON.stringify(user));
+      const { isConfigured, auth: firebaseAuth, db: firestoreDb } = initFirebaseService();
+
+      if (!isConfigured || !firebaseAuth || !firestoreDb) {
+        return { success: false, error: 'Firebase belum dikonfigurasi.' };
+      }
+
+      // Strict 2-second timeout guard for non-blocking sign-in
+      const signInPromise = signInWithEmailAndPassword(firebaseAuth, emailToAuth, pass);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Auth Timeout')), 2000)
+      );
+
+      const cred = await Promise.race([signInPromise, timeoutPromise]) as Awaited<ReturnType<typeof signInWithEmailAndPassword>>;
+      const authUser = cred.user;
+
+      if (!authUser) {
+        return { success: false, error: 'Akun tidak terdaftar di Firebase Auth.' };
+      }
+
+      const emailLower = (authUser.email || emailToAuth).toLowerCase();
+      const isSuperAdmin = emailLower === 'pandir@pandirstore.com' || emailLower === 'admin@pandirstore.com';
+
+      // Immediate non-blocking state commit & local storage for instant navigation under 1s
+      const instantUser: UserAccount = {
+        id: authUser.uid,
+        email: authUser.email || emailToAuth,
+        name: authUser.displayName || (isSuperAdmin ? 'Pemilik Toko (Admin Super)' : 'Kasir Toko'),
+        role: isSuperAdmin ? 'admin' : 'kasir',
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      };
+
+      setCurrentUser(instantUser);
+      localStorage.setItem('pandir_current_user', JSON.stringify(instantUser));
+
+      // Asynchronously fetch full profile from Firestore in the background
+      getDoc(doc(firestoreDb, 'users', authUser.uid))
+        .then((docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data() as Record<string, any>;
+            if (data && data.status === 'active') {
+              const bgSuperAdmin = emailLower === 'pandir@pandirstore.com' || emailLower === 'admin@pandirstore.com' || data.role?.toLowerCase() === 'admin';
+              const fullUser: UserAccount = {
+                id: authUser.uid,
+                email: authUser.email || data.email || emailToAuth,
+                name: data.name || authUser.displayName || instantUser.name,
+                role: bgSuperAdmin ? 'admin' : (data.role || 'kasir'),
+                status: 'active',
+                createdAt: data.createdAt || instantUser.createdAt,
+              };
+              setCurrentUser(fullUser);
+              localStorage.setItem('pandir_current_user', JSON.stringify(fullUser));
+            }
+          }
+        })
+        .catch(() => {
+          // Ignore background fetch errors to prevent blocking
+        });
+
       return { success: true };
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Gagal masuk. Silakan periksa kredensial Anda.';
-      return { success: false, error: errorMessage };
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('Timeout') || msg.includes('timeout')) {
+        return { success: false, error: 'Koneksi lambat atau timeout (2s).' };
+      }
+      return { success: false, error: 'Akun tidak terdaftar di Firebase Auth atau kata sandi salah.' };
     }
   };
 
   const logout = (reason?: string) => {
+    if (auth) {
+      signOut(auth).catch(() => {});
+    }
     setCurrentUser(null);
     localStorage.removeItem('pandir_current_user');
     if (reason) {
@@ -87,7 +208,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const clearSessionMessage = () => setSessionRevokedMessage(null);
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'pandir@pandirstore.com' || currentUser?.email?.toLowerCase() === 'admin@pandirstore.com';
   const isAuthenticated = !!currentUser;
 
   return (

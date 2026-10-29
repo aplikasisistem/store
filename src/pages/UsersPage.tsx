@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { storage } from '../services/storage';
+import { createUserWithSync, deleteUserWithSync } from '../services/userService';
 import { UserAccount, UserRole } from '../types';
 import { 
   Users, 
@@ -67,39 +68,37 @@ export const UsersPage: React.FC = () => {
   // Form error state
   const [formError, setFormError] = useState<string | null>(null);
 
-  const handleCreateUser = () => {
+  const handleCreateUser = async () => {
     if (!newName.trim() || !newEmail.trim() || !newPassword.trim()) {
       setFormError('Semua field (Nama, Email, dan Password) wajib diisi.');
       return;
     }
     setFormError(null);
 
-    const newUser: UserAccount = {
-      id: `user-${Date.now()}`,
-      name: newName.trim(),
-      email: newEmail.trim().toLowerCase(),
-      role: newRole,
-      password: newPassword,
-      status: 'active',
-      createdAt: new Date().toISOString(),
-    };
+    const res = await createUserWithSync(newName, newEmail, newPassword, newRole);
+    if (!res.success) {
+      setFormError(res.error || 'Gagal membuat akun.');
+      return;
+    }
 
-    storage.updateUser(newUser);
     refreshList();
     setIsAddModalOpen(false);
     setNewName('');
     setNewEmail('');
     setNewPassword('');
-    showToast(`Akun ${newRole === 'kasir' ? 'Kasir' : 'Admin'} "${newUser.name}" berhasil dibuat!`);
+    showToast(`Akun ${newRole === 'kasir' ? 'Kasir' : 'Admin'} "${newName.trim()}" berhasil dibuat secara sinkron!`);
   };
 
-  const confirmDeleteUser = () => {
+  const confirmDeleteUser = async () => {
     if (!deletingUserTarget) return;
     const deletedName = deletingUserTarget.name;
-    storage.deleteUser(deletingUserTarget.id);
+
+    await deleteUserWithSync(deletingUserTarget);
+
     setUsers((prev) => prev.filter((u) => u.id !== deletingUserTarget.id));
     setDeletingUserTarget(null);
-    showToast(`Akun "${deletedName}" berhasil dihapus secara real-time!`);
+    refreshList();
+    showToast(`Akun "${deletedName}" berhasil dihapus secara permanen dari Auth & Firestore!`);
   };
 
   const handleUpdatePassword = () => {
