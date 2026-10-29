@@ -9,7 +9,9 @@ import {
   CapitalLog, 
   StockFlowLog, 
   SystemSettings, 
-  PaymentMethod 
+  PaymentMethod,
+  HppCalculationMethod,
+  ProductPriceUpdatePayload
 } from '../types';
 import { storage } from '../services/storage';
 import { sendToGoogleSheetsWebhook, getActiveFirebaseConfig } from '../services/firebase';
@@ -61,7 +63,10 @@ interface StoreContextType {
     unit: string, 
     quantity: number, 
     notes?: string, 
-    costPrice?: number
+    costPrice?: number,
+    hppMethod?: HppCalculationMethod,
+    recordPettyCash?: boolean,
+    updatedSellingPrices?: ProductPriceUpdatePayload
   ) => void;
   
   // Debt Actions
@@ -456,34 +461,112 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     reloadAllData();
   };
 
-  // --- RESTOCK MULTI-TIER UNITS ---
+  // --- RESTOCK MULTI-TIER UNITS (KG, BOX, PCS, LITER) WITH WEIGHTED AVERAGE / LAST PRICE ---
   const restockProduct = (
     productId: string, 
     unit: string, 
     quantity: number, 
     notes?: string,
-    costPrice?: number
+    costPrice?: number,
+    hppMethod: HppCalculationMethod = 'weighted_average',
+    recordPettyCash: boolean = true,
+    updatedSellingPrices?: ProductPriceUpdatePayload
   ) => {
     const product = products.find((p) => p.id === productId);
     if (!product || quantity <= 0) return;
 
     const available = storage.getAvailableUnitsForProduct(product);
-    const matched = available.find((u) => u.unit.toLowerCase() === unit.toLowerCase()) || available[0];
+    const matched = available.find((u) => u.unit.toLowerCase() === unit.toLowerCase()) || available[0] || {
+      unit: product.baseUnit,
+      ratio: 1,
+      price: product.priceBase || 0,
+      cost: product.costBase || 0,
+      label: product.baseUnit,
+    };
 
-    const baseQuantityToAdd = quantity * matched.ratio;
-    const stockBefore = product.stock;
-    const stockAfter = Math.round((stockBefore + baseQuantityToAdd) * 1000) / 1000;
+    const unitRatio = matched.ratio > 0 ? matched.ratio : 1;
+    const quantityToAdd = Math.max(0, quantity);
+    const baseQuantityToAdd = Math.round((quantityToAdd * unitRatio) * 10000) / 10000;
+    const stockBefore = Math.max(0, product.stock || 0);
+    const stockAfter = Math.round((product.stock + baseQuantityToAdd) * 10000) / 10000;
+
+    const oldCostBase = typeof product.costBase === 'number' && !isNaN(product.costBase) && product.costBase >= 0 
+      ? product.costBase 
+      : 0;
+
+    const supplierUnitCost = typeof costPrice === 'number' && !isNaN(costPrice) && costPrice >= 0 
+      ? costPrice 
+      : 0;
+
+    const supplierBaseCost = unitRatio > 0 ? supplierUnitCost / unitRatio : supplierUnitCost;
+
+    // Calculate new base HPP according to chosen method
+    let newCostBase = oldCostBase;
+    if (supplierUnitCost > 0) {
+      if (hppMethod === 'last_price' || stockBefore <= 0) {
+        // Last Purchase Price or stock was exhausted / zero
+        newCostBase = Math.round(supplierBaseCost);
+      } else {
+        // Weighted Average (Rata-Rata Tertimbang):
+        // HPP Baru = ((Stok Lama * HPP Lama) + (Stok Masuk Baru * Harga Beli Baru)) / (Stok Lama + Stok Masuk Baru)
+        const oldAssetValue = stockBefore * oldCostBase;
+        const newBatchValue = baseQuantityToAdd * supplierBaseCost;
+        const totalBaseUnits = stockBefore + baseQuantityToAdd;
+
+        if (totalBaseUnits > 0) {
+          newCostBase = Math.round((oldAssetValue + newBatchValue) / totalBaseUnits);
+        } else {
+          newCostBase = Math.round(supplierBaseCost);
+        }
+      }
+    }
+
+    // Update downstream tier costs (Dus -> Renceng -> Pcs)
+    const updatedTierConfig = product.tierConfig ? {
+      ...product.tierConfig,
+      costTier2: product.tierConfig.tier2Ratio ? Math.round(newCostBase * product.tierConfig.tier2Ratio) : undefined,
+      costTier3: product.tierConfig.tier3Ratio ? Math.round(newCostBase * product.tierConfig.tier3Ratio) : undefined,
+    } : undefined;
+
+    // Update downstream packaging variants costs proportionally (e.g. 500g, 250g, 100g, Dus, Renceng, etc.)
+    const updatedPackagingVariants = product.packagingVariants && product.packagingVariants.length > 0
+      ? product.packagingVariants.map((v) => ({
+          ...v,
+          costPrice: Math.round(newCostBase * (v.ratioToBase > 0 ? v.ratioToBase : 1)),
+        }))
+      : product.packagingVariants;
+
+    // Recalculate total asset purchase cost
+    const totalPurchaseCost = Math.round(Math.max(0, stockAfter) * newCostBase);
+
+    // Apply any user-specified selling price adjustments directly
+    let finalTierConfig = updatedSellingPrices?.tierConfig !== undefined ? updatedSellingPrices.tierConfig : updatedTierConfig;
+    let finalPackagingVariants = updatedSellingPrices?.packagingVariants !== undefined ? updatedSellingPrices.packagingVariants : updatedPackagingVariants;
 
     const updatedProduct: Product = {
       ...product,
       stock: stockAfter,
-      costBase: costPrice ? (matched.ratio === 1 ? costPrice : costPrice / matched.ratio) : product.costBase,
+      costBase: newCostBase,
+      totalPurchaseCost,
+      tierConfig: finalTierConfig,
+      packagingVariants: finalPackagingVariants,
+      ...(updatedSellingPrices?.priceBase !== undefined && { priceBase: updatedSellingPrices.priceBase }),
+      ...(updatedSellingPrices?.hargaJualKg !== undefined && { hargaJualKg: updatedSellingPrices.hargaJualKg }),
+      ...(updatedSellingPrices?.hargaJualGram500 !== undefined && { hargaJualGram500: updatedSellingPrices.hargaJualGram500 }),
+      ...(updatedSellingPrices?.hargaJualGram250 !== undefined && { hargaJualGram250: updatedSellingPrices.hargaJualGram250 }),
+      ...(updatedSellingPrices?.hargaJualGram100 !== undefined && { hargaJualGram100: updatedSellingPrices.hargaJualGram100 }),
+      ...(updatedSellingPrices?.hargaJualDus !== undefined && { hargaJualDus: updatedSellingPrices.hargaJualDus }),
+      ...(updatedSellingPrices?.hargaJualRenceng !== undefined && { hargaJualRenceng: updatedSellingPrices.hargaJualRenceng }),
+      ...(updatedSellingPrices?.hargaJualPcs !== undefined && { hargaJualPcs: updatedSellingPrices.hargaJualPcs }),
+      ...(updatedSellingPrices?.enableSubVariants !== undefined && { enableSubVariants: updatedSellingPrices.enableSubVariants }),
       updatedAt: new Date().toISOString(),
     };
 
     storage.updateProduct(updatedProduct);
 
-    // Add stock flow log
+    const totalInvoiceAmount = Math.round(supplierUnitCost * quantityToAdd);
+
+    // Record detailed financial & stock flow audit log
     storage.addStockLog({
       id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       productId: product.id,
@@ -491,23 +574,27 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       productCode: product.code,
       type: 'RESTOK_MASUK',
       originalUnit: matched.unit,
-      originalQuantity: quantity,
+      originalQuantity: quantityToAdd,
       baseQuantityChange: baseQuantityToAdd,
       baseUnit: product.baseUnit,
-      stockBefore,
+      stockBefore: product.stock,
       stockAfter,
-      notes: notes || `Restok ${quantity} ${matched.unit}`,
+      unitCost: supplierUnitCost,
+      totalCost: totalInvoiceAmount,
+      oldHppBase: oldCostBase,
+      newHppBase: newCostBase,
+      hppMethod: hppMethod,
+      notes: notes || `Restok ${quantityToAdd} ${matched.unit}`,
       timestamp: new Date().toISOString(),
     });
 
-    // Also record petty cash out if supplier was paid
-    if (costPrice && costPrice > 0) {
-      const totalPurchase = costPrice * quantity;
+    // Optionally record petty cash out for supplier payment
+    if (recordPettyCash && totalInvoiceAmount > 0) {
       addPettyCashEntry({
         type: 'kas_keluar',
         category: 'Bayar Supplier',
-        amount: totalPurchase,
-        description: `Restok ${product.name} (${quantity} ${matched.unit})`,
+        amount: totalInvoiceAmount,
+        description: `Restok ${product.name} (${quantityToAdd} ${matched.unit}) - ${notes || 'Faktur Pembelian'}`,
         cashierName: 'Admin / Kasir',
       });
     }

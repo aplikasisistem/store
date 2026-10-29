@@ -605,23 +605,30 @@ export const POSPage: React.FC = () => {
 
     const remainingMasterStock = Math.max(0, Math.round((selectedVariantProduct.stock - inCartBase) * 10000) / 10000);
 
+    const availableUnits = storage.getAvailableUnitsForProduct(selectedVariantProduct);
+
     let totalNewBase = 0;
-    if (selectedVariantProduct.packagingVariants) {
-      selectedVariantProduct.packagingVariants.forEach((v) => {
-        const qty = variantQuantities[v.id] || (v.name ? variantQuantities[v.name] : 0) || 0;
-        if (qty > 0) {
-          totalNewBase += qty * v.ratioToBase;
-        }
-      });
-    }
+    let totalItemsSelected = 0;
+
+    availableUnits.forEach((opt) => {
+      const key = opt.variantId || opt.unit;
+      const qty = variantQuantities[key] || 0;
+      if (qty > 0) {
+        totalItemsSelected += qty;
+        const ratio = opt.ratio > 0 ? opt.ratio : 1;
+        totalNewBase += qty * ratio;
+      }
+    });
+
     if (customWeighableAmount > 0) {
+      totalItemsSelected += 1;
       totalNewBase += customWeighableAmount;
     }
 
     totalNewBase = Math.round(totalNewBase * 10000) / 10000;
 
-    if (totalNewBase <= 0) {
-      setVariantModalError('Pilih setidaknya 1 varian kemasan atau masukkan berat timbangan.');
+    if (totalItemsSelected <= 0 || totalNewBase <= 0) {
+      setVariantModalError('Pilih setidaknya 1 varian kemasan atau masukkan kuantitas barang yang valid.');
       return;
     }
 
@@ -634,7 +641,7 @@ export const POSPage: React.FC = () => {
     }
 
     let addedCount = 0;
-    storage.getAvailableUnitsForProduct(selectedVariantProduct).forEach((opt) => {
+    availableUnits.forEach((opt) => {
       const key = opt.variantId || opt.unit;
       const qty = variantQuantities[key] || 0;
       if (qty > 0) {
@@ -649,7 +656,7 @@ export const POSPage: React.FC = () => {
     }
 
     sound.playScanBeep();
-    showVoiceToast(`Berhasil menambahkan ${addedCount} kemasan!`);
+    showVoiceToast(`Berhasil menambahkan ${addedCount} barang ke keranjang!`);
     setSelectedVariantProduct(null);
     setVariantQuantities({});
     setCustomWeighableAmount(0);

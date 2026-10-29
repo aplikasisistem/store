@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useAuth } from '../context/AuthContext';
-import { Product, UnitType, RetailPackagingVariant } from '../types';
+import { Product, UnitType, RetailPackagingVariant, HppCalculationMethod, ProductPriceUpdatePayload } from '../types';
 import { storage } from '../services/storage';
 import { 
   Boxes, 
@@ -21,7 +21,12 @@ import {
   Droplets,
   Lock,
   Sparkles,
-  Coins
+  Coins,
+  TrendingUp,
+  TrendingDown,
+  ArrowRight,
+  DollarSign,
+  FileText
 } from 'lucide-react';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
 import { StockConversionCalculator } from '../components/StockConversionCalculator';
@@ -41,7 +46,22 @@ export const InventoryPage: React.FC = () => {
   const [restockUnit, setRestockUnit] = useState<string>('');
   const [restockQty, setRestockQty] = useState<number>(1);
   const [restockCost, setRestockCost] = useState<number>(0);
+  const [restockHppMethod, setRestockHppMethod] = useState<HppCalculationMethod>('weighted_average');
+  const [restockRecordPettyCash, setRestockRecordPettyCash] = useState<boolean>(true);
   const [restockNotes, setRestockNotes] = useState<string>('');
+
+  // Restock Selling Price Adjustment States
+  const [restockPriceBase, setRestockPriceBase] = useState<number>(0);
+  const [restockHargaJualKg, setRestockHargaJualKg] = useState<number>(0);
+  const [restockHargaJualGram500, setRestockHargaJualGram500] = useState<number>(0);
+  const [restockHargaJualGram250, setRestockHargaJualGram250] = useState<number>(0);
+  const [restockHargaJualGram100, setRestockHargaJualGram100] = useState<number>(0);
+  const [restockHargaJualDus, setRestockHargaJualDus] = useState<number>(0);
+  const [restockHargaJualRenceng, setRestockHargaJualRenceng] = useState<number>(0);
+  const [restockHargaJualPcs, setRestockHargaJualPcs] = useState<number>(0);
+  const [restockPackagingVariants, setRestockPackagingVariants] = useState<RetailPackagingVariant[]>([]);
+  const [restockEnableSubVariants, setRestockEnableSubVariants] = useState<boolean>(true);
+  const [restockShowPriceAdjust, setRestockShowPriceAdjust] = useState<boolean>(true);
 
   // Add / Edit / Delete Product Modal State
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
@@ -74,17 +94,59 @@ export const InventoryPage: React.FC = () => {
   const handleOpenRestock = (product: Product) => {
     setRestockProductTarget(product);
     const available = storage.getAvailableUnitsForProduct(product);
-    const defaultUnit = product.tierConfig?.tier3Name || product.baseUnit;
+    const defaultUnit = product.tierConfig?.tier3Name || available[0]?.unit || product.baseUnit;
     setRestockUnit(defaultUnit);
     setRestockQty(1);
     const matched = available.find((u) => u.unit === defaultUnit) || available[0];
-    setRestockCost(matched.cost);
+    setRestockCost(matched?.cost || product.costBase || 0);
+    setRestockHppMethod('weighted_average');
+    setRestockRecordPettyCash(true);
     setRestockNotes('Restok dari supplier');
+
+    const pBase = product.priceBase || 0;
+    const pKg = product.hargaJualKg ?? pBase;
+    setRestockPriceBase(pBase);
+    setRestockHargaJualKg(pKg);
+    setRestockHargaJualGram500(product.hargaJualGram500 ?? (pKg > 0 ? Math.round((pKg * 0.5) / 100) * 100 : 0));
+    setRestockHargaJualGram250(product.hargaJualGram250 ?? (pKg > 0 ? Math.round((pKg * 0.25) / 100) * 100 : 0));
+    setRestockHargaJualGram100(product.hargaJualGram100 ?? (pKg > 0 ? Math.round((pKg * 0.1) / 100) * 100 : 0));
+    setRestockHargaJualDus(product.hargaJualDus ?? 0);
+    setRestockHargaJualRenceng(product.hargaJualRenceng ?? 0);
+    setRestockHargaJualPcs(product.hargaJualPcs ?? pBase);
+    setRestockPackagingVariants(
+      product.packagingVariants ? product.packagingVariants.map((v) => ({ ...v })) : []
+    );
+    setRestockEnableSubVariants(product.enableSubVariants !== false);
+    setRestockShowPriceAdjust(true);
   };
 
   const handleExecuteRestock = () => {
     if (!restockProductTarget || restockQty <= 0) return;
-    restockProduct(restockProductTarget.id, restockUnit, restockQty, restockNotes, restockCost);
+
+    const priceUpdates: ProductPriceUpdatePayload = {
+      priceBase: restockPriceBase,
+      hargaJualKg: restockHargaJualKg,
+      hargaJualGram500: restockHargaJualGram500,
+      hargaJualGram250: restockHargaJualGram250,
+      hargaJualGram100: restockHargaJualGram100,
+      hargaJualDus: restockHargaJualDus,
+      hargaJualRenceng: restockHargaJualRenceng,
+      hargaJualPcs: restockHargaJualPcs,
+      packagingVariants: restockPackagingVariants,
+      enableSubVariants: restockEnableSubVariants,
+    };
+
+    restockProduct(
+      restockProductTarget.id, 
+      restockUnit, 
+      restockQty, 
+      restockNotes, 
+      restockCost,
+      restockHppMethod,
+      restockRecordPettyCash,
+      priceUpdates
+    );
+    showToast(`Restok ${restockQty} ${restockUnit} "${restockProductTarget.name}" berhasil diproses & harga jual disinkronkan ke kasir!`);
     setRestockProductTarget(null);
   };
 
@@ -106,6 +168,7 @@ export const InventoryPage: React.FC = () => {
       totalPurchaseCost: 0,
       hargaJualKg: 0,
       packagingVariants: [],
+      enableSubVariants: true,
       tierConfig: {
         baseUnit: 'kg',
       },
@@ -147,6 +210,7 @@ export const InventoryPage: React.FC = () => {
     setProductType(initialType);
     setEditingProduct({
       ...p,
+      enableSubVariants: p.enableSubVariants !== false,
       totalPurchaseCost: defaultTotalPurchaseCost,
     });
     setIsEditModalOpen(true);
@@ -237,6 +301,7 @@ export const InventoryPage: React.FC = () => {
       hargaJualDus,
       hargaJualRenceng,
       hargaJualPcs,
+      enableSubVariants: editingProduct.enableSubVariants !== false,
       // Ensure unit specific fields are kept based on type. Allow undefined for optional tiers.
       hargaJualKg: productType === 'kg' ? (editingProduct.hargaJualKg ? Number(editingProduct.hargaJualKg) : priceBase) : undefined,
       packagingVariants: editingProduct.packagingVariants || [],
@@ -773,8 +838,9 @@ export const InventoryPage: React.FC = () => {
                   <th className="py-2.5 px-4">Waktu</th>
                   <th className="py-2.5 px-3">Kode &amp; Nama Barang</th>
                   <th className="py-2.5 px-3">Jenis Transaksi</th>
-                  <th className="py-2.5 px-3">Jumlah (Base Unit)</th>
+                  <th className="py-2.5 px-3">Jumlah Masuk/Keluar</th>
                   <th className="py-2.5 px-3">Perubahan Stok</th>
+                  <th className="py-2.5 px-3">Harga Beli &amp; HPP (Audit Keuangan)</th>
                   <th className="py-2.5 px-4">Catatan Detail</th>
                 </tr>
               </thead>
@@ -783,20 +849,28 @@ export const InventoryPage: React.FC = () => {
                   const isAdd = log.baseQuantityChange > 0;
                   return (
                     <tr key={log.id} className="hover:bg-slate-50/80 transition">
-                      <td className="py-2.5 px-4 font-mono text-[10px] text-slate-400">
+                      <td className="py-2.5 px-4 font-mono text-[10px] text-slate-400 whitespace-nowrap">
                         {new Date(log.timestamp).toLocaleString('id-ID')}
                       </td>
                       <td className="py-2.5 px-3">
                         <div className="font-bold text-slate-800">{log.productName}</div>
                         <div className="font-mono text-[10px] text-slate-400">{log.productCode}</div>
                       </td>
-                      <td className="py-2.5 px-3 font-semibold text-slate-600 uppercase text-[10px]">
-                        {log.type}
+                      <td className="py-2.5 px-3">
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                          log.type === 'RESTOK_MASUK'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : log.type === 'PENJUALAN_POS'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {log.type === 'RESTOK_MASUK' ? 'Restok Masuk' : log.type === 'PENJUALAN_POS' ? 'Penjualan Kasir' : 'Penyesuaian'}
+                        </span>
                       </td>
-                      <td className="py-2.5 px-3 font-bold text-slate-700">
+                      <td className="py-2.5 px-3 font-bold text-slate-700 whitespace-nowrap">
                         {log.originalQuantity} {log.originalUnit}
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-3 whitespace-nowrap">
                         <span
                           className={`font-black px-2 py-0.5 rounded ${
                             isAdd ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700'
@@ -805,7 +879,33 @@ export const InventoryPage: React.FC = () => {
                           {isAdd ? `+${log.baseQuantityChange}` : log.baseQuantityChange} {log.baseUnit}
                         </span>
                       </td>
-                      <td className="py-2.5 px-4 text-slate-500 italic">
+                      <td className="py-2.5 px-3">
+                        {log.type === 'RESTOK_MASUK' && (log.unitCost !== undefined || log.totalCost !== undefined) ? (
+                          <div className="space-y-0.5">
+                            <div className="font-bold text-slate-800">
+                              Rp {(log.unitCost || 0).toLocaleString('id-ID')} <span className="text-[10px] text-slate-500 font-normal">/ {log.originalUnit}</span>
+                            </div>
+                            <div className="text-[10px] text-emerald-800 font-bold">
+                              Faktur: Rp {(log.totalCost || 0).toLocaleString('id-ID')}
+                            </div>
+                            {log.newHppBase !== undefined && (
+                              <div className="text-[9px] text-slate-500 flex items-center gap-1 font-mono pt-0.5">
+                                <span>HPP: Rp {(log.oldHppBase || 0).toLocaleString('id-ID')} ➔ <strong>Rp {log.newHppBase.toLocaleString('id-ID')}</strong></span>
+                                <span className={`px-1 rounded text-[8px] font-bold ${
+                                  log.hppMethod === 'last_price' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                                }`}>
+                                  {log.hppMethod === 'last_price' ? 'Terakhir' : 'Rata2'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ) : log.type === 'PENJUALAN_POS' ? (
+                          <span className="text-[10px] text-slate-400 font-medium">Transaksi Kasir</span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">-</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-4 text-slate-600 italic">
                         {log.notes || '-'}
                       </td>
                     </tr>
@@ -817,137 +917,850 @@ export const InventoryPage: React.FC = () => {
         </div>
       )}
 
-      {/* RESTOCK MODAL */}
-      {restockProductTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl space-y-4">
-            <div className="bg-emerald-950 text-white px-5 py-4 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-sm flex items-center gap-1.5">
-                  <PackagePlus className="w-4 h-4 text-emerald-400" />
-                  <span>Restok Barang Masuk</span>
-                </h3>
-                <p className="text-[11px] text-emerald-200 mt-0.5">{restockProductTarget.name}</p>
-              </div>
-              <button
-                onClick={() => setRestockProductTarget(null)}
-                className="text-emerald-300 hover:text-white text-sm"
-              >
-                ✕
-              </button>
-            </div>
+      {/* RESTOCK MODAL WITH WEIGHTED AVERAGE & LAST PRICE HPP ENGINE */}
+      {restockProductTarget && (() => {
+        const product = restockProductTarget;
+        const availableUnits = storage.getAvailableUnitsForProduct(product);
+        const matchedUnit = availableUnits.find((u) => u.unit.toLowerCase() === restockUnit.toLowerCase()) || availableUnits[0] || {
+          unit: product.baseUnit,
+          ratio: 1,
+          price: product.priceBase || 0,
+          cost: product.costBase || 0,
+          label: product.baseUnit,
+        };
 
-            <div className="p-5 space-y-3.5 text-xs">
-              {/* Unit selector */}
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Pilih Satuan Barang Restok Masuk:
-                </label>
-                <select
-                  value={restockUnit}
-                  onChange={(e) => {
-                    const selected = e.target.value;
-                    setRestockUnit(selected);
-                    const available = storage.getAvailableUnitsForProduct(restockProductTarget);
-                    const matched = available.find((u) => u.unit === selected);
-                    if (matched) setRestockCost(matched.cost);
-                  }}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900"
+        const unitRatio = matchedUnit.ratio > 0 ? matchedUnit.ratio : 1;
+        const safeQty = Math.max(0, Number(restockQty) || 0);
+        const baseAdded = Math.round((safeQty * unitRatio) * 10000) / 10000;
+        const currentStock = Math.max(0, Number(product.stock) || 0);
+        const newStock = Math.round((product.stock + baseAdded) * 10000) / 10000;
+        
+        const currentHppBase = Math.max(0, Number(product.costBase) || 0);
+        const supplierCost = Math.max(0, Number(restockCost) || 0);
+        const supplierBaseCost = unitRatio > 0 ? supplierCost / unitRatio : supplierCost;
+        const totalInvoice = Math.round(safeQty * supplierCost);
+
+        // Calculate simulated HPP
+        let simulatedHppBase = currentHppBase;
+        if (supplierCost > 0) {
+          if (restockHppMethod === 'last_price' || currentStock <= 0) {
+            simulatedHppBase = Math.round(supplierBaseCost);
+          } else {
+            const oldAssetValue = currentStock * currentHppBase;
+            const newBatchValue = baseAdded * supplierBaseCost;
+            const totalBaseUnits = currentStock + baseAdded;
+            simulatedHppBase = totalBaseUnits > 0 
+              ? Math.round((oldAssetValue + newBatchValue) / totalBaseUnits) 
+              : Math.round(supplierBaseCost);
+          }
+        }
+
+        const hppDiff = simulatedHppBase - currentHppBase;
+        const hppDiffPct = currentHppBase > 0 ? ((hppDiff / currentHppBase) * 100).toFixed(1) : '0';
+
+        // Detect product unit family for breakdowns
+        const isBoxType = Boolean(product.rasioRencengPerDus && product.rasioPcsPerRenceng) || 
+          product.tierConfig?.tier3Name === 'dus' || 
+          product.baseUnit === 'dus' || 
+          (product.packagingVariants?.some(v => v.name.toLowerCase().includes('dus')));
+
+        const rencengPerDus = product.rasioRencengPerDus || 48;
+        const pcsPerRenceng = product.rasioPcsPerRenceng || 10;
+        const totalPerDus = rencengPerDus * pcsPerRenceng;
+
+        const isKgType = product.isWeighable || product.baseUnit === 'kg' || Boolean(product.hargaJualKg);
+        const isLiterType = product.baseUnit === 'liter';
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-xs overflow-y-auto">
+            <div className="bg-white rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] my-auto animate-in fade-in zoom-in-95">
+              
+              {/* MODAL HEADER */}
+              <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0">
+                    <PackagePlus className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-black text-sm text-white">Restok Barang Masuk &amp; Update HPP</h3>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        {isBoxType ? 'DUS / BOX' : isKgType ? 'KG / WEIGH' : isLiterType ? 'LITER / CAIR' : 'PCS / RETAIL'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 font-semibold mt-0.5">
+                      {product.name} &bull; <span className="font-mono text-emerald-400">{product.code}</span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRestockProductTarget(null)}
+                  className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition"
                 >
-                  {storage.getAvailableUnitsForProduct(restockProductTarget).map((u, uIdx) => (
-                    <option key={`${u.variantId || u.unit}-${uIdx}`} value={u.unit}>
-                      {u.label}
-                    </option>
-                  ))}
-                </select>
+                  ✕
+                </button>
               </div>
 
-              {/* Restock Quantity */}
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Jumlah Restok Masuk ({restockUnit}):
-                </label>
-                <FormattedNumberInput
-                  value={restockQty}
-                  onChange={(val) => setRestockQty(val)}
-                  allowDecimal={restockProductTarget.isWeighable || restockUnit === 'kg'}
-                  suffix={restockUnit}
-                  className="bg-white"
-                  placeholder="1"
-                />
-              </div>
+              {/* MODAL BODY (SCROLLABLE) */}
+              <div className="p-5 space-y-4 overflow-y-auto text-xs">
+                
+                {/* Product Snapshot Info Card */}
+                <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Stok Master Saat Ini</span>
+                    <span className="font-black text-sm text-slate-900">
+                      {formatNumberWithDots(product.stock, isKgType || isLiterType)} {product.baseUnit}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">HPP Modal Master</span>
+                    <span className="font-black text-sm text-emerald-800">
+                      Rp {currentHppBase.toLocaleString('id-ID')} <span className="text-[10px] text-slate-500 font-normal">/ {product.baseUnit}</span>
+                    </span>
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Total Nilai Aset Lama</span>
+                    <span className="font-black text-xs text-slate-700">
+                      Rp {Math.round(currentStock * currentHppBase).toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                </div>
 
-              {/* Live conversion info */}
-              {(() => {
-                const available = storage.getAvailableUnitsForProduct(restockProductTarget);
-                const matched = available.find((u) => u.unit === restockUnit);
-                const ratio = matched ? matched.ratio : 1;
-                const baseAdded = restockQty * ratio;
-                const newTotal = restockProductTarget.stock + baseAdded;
+                {/* Restock Form Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Unit Selector */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-800 block mb-1">
+                      Pilih Satuan Barang Masuk:
+                    </label>
+                    <select
+                      value={restockUnit}
+                      onChange={(e) => {
+                        const selected = e.target.value;
+                        setRestockUnit(selected);
+                        const matched = availableUnits.find((u) => u.unit === selected);
+                        if (matched) setRestockCost(matched.cost);
+                      }}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    >
+                      {availableUnits.map((u, uIdx) => {
+                        let cleanLabel = u.unit;
+                        if (u.isVariant) {
+                          cleanLabel = `${u.unit} (${u.ratio} ${product.baseUnit})`;
+                        } else if (u.unit.toLowerCase() === product.baseUnit.toLowerCase() || Math.abs(u.ratio - 1) < 0.0001) {
+                          cleanLabel = `${u.unit.toUpperCase()} (Satuan Utama)`;
+                        } else if (u.ratio && u.ratio !== 1) {
+                          cleanLabel = `${u.unit} (Isi ${u.ratio} ${product.baseUnit})`;
+                        }
 
-                return (
-                  <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs space-y-1">
-                    <div className="font-bold text-emerald-900 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span>Kalkulasi Otomatis Konversi:</span>
+                        return (
+                          <option key={`${u.variantId || u.unit}-${uIdx}`} value={u.unit}>
+                            {cleanLabel}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {/* Restock Quantity */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-800 block mb-1">
+                      Jumlah Masuk ({restockUnit}):
+                    </label>
+                    <FormattedNumberInput
+                      value={restockQty}
+                      onChange={(val) => setRestockQty(Math.max(0, val))}
+                      allowDecimal={isKgType || isLiterType || restockUnit === 'kg'}
+                      suffix={restockUnit}
+                      className="bg-white font-bold"
+                      placeholder="1"
+                    />
+                  </div>
+                </div>
+
+                {/* Supplier Purchase Cost */}
+                <div className="bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-emerald-950">
+                      Harga Beli Baru dari Supplier (per {restockUnit}):
+                    </label>
+                    {unitRatio > 1 && supplierCost > 0 && (
+                      <span className="text-[11px] font-bold text-emerald-800">
+                        = Rp {Math.round(supplierBaseCost).toLocaleString('id-ID')} / {product.baseUnit}
+                      </span>
+                    )}
+                  </div>
+                  <FormattedNumberInput
+                    value={restockCost}
+                    onChange={(val) => setRestockCost(Math.max(0, val))}
+                    prefix="Rp"
+                    className="bg-white font-black text-slate-900 text-sm"
+                    placeholder="0"
+                  />
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-900 pt-0.5">
+                    <span>Total Faktur Pembelian:</span>
+                    <span className="font-black text-xs text-emerald-800">
+                      Rp {totalInvoice.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* HPP Calculation Method Selector */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-800 block">
+                    Pilih Metode Pembaruan HPP (Harga Pokok Penjualan):
+                  </label>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Method 1: Weighted Average */}
+                    <div
+                      onClick={() => setRestockHppMethod('weighted_average')}
+                      className={`p-3 rounded-xl border-2 cursor-pointer transition flex flex-col justify-between ${
+                        restockHppMethod === 'weighted_average'
+                          ? 'border-emerald-600 bg-emerald-50/70 shadow-xs'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <div className="flex items-center gap-1.5 font-black text-xs text-slate-900">
+                            <input
+                              type="radio"
+                              name="hppMethod"
+                              checked={restockHppMethod === 'weighted_average'}
+                              onChange={() => setRestockHppMethod('weighted_average')}
+                              className="text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <span>Rata-Rata Tertimbang</span>
+                          </div>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white">
+                            Rekomendasi
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-600 leading-tight">
+                          ((Stok Lama &times; HPP Lama) + (Stok Masuk &times; Harga Baru)) &divide; Total Stok. Menjaga HPP seimbang &amp; presisi.
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-emerald-800">
-                      {formatNumberWithDots(restockQty, restockProductTarget.isWeighable || restockUnit === 'kg')} {restockUnit} = <strong>+{formatNumberWithDots(baseAdded, true)} {restockProductTarget.baseUnit}</strong>
-                    </div>
-                    <div className="text-[11px] text-slate-600">
-                      Stok Sekarang: {formatNumberWithDots(restockProductTarget.stock, true)} {restockProductTarget.baseUnit} ➔{' '}
-                      <strong>Menjadi: {formatNumberWithDots(newTotal, true)} {restockProductTarget.baseUnit}</strong>
+
+                    {/* Method 2: Last Purchase Price */}
+                    <div
+                      onClick={() => setRestockHppMethod('last_price')}
+                      className={`p-3 rounded-xl border-2 cursor-pointer transition flex flex-col justify-between ${
+                        restockHppMethod === 'last_price'
+                          ? 'border-emerald-600 bg-emerald-50/70 shadow-xs'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <div className="flex items-center gap-1.5 font-black text-xs text-slate-900">
+                            <input
+                              type="radio"
+                              name="hppMethod"
+                              checked={restockHppMethod === 'last_price'}
+                              onChange={() => setRestockHppMethod('last_price')}
+                              className="text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <span>Harga Terakhir</span>
+                          </div>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">
+                            Replacement
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-600 leading-tight">
+                          HPP langsung diganti 100% mengikuti harga beli masuk dari faktur terbaru supplier ini.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                );
-              })()}
+                </div>
 
-              {/* Supplier Purchase Cost */}
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Harga Beli per {restockUnit} (Modal Supplier):
-                </label>
-                <FormattedNumberInput
-                  value={restockCost}
-                  onChange={(val) => setRestockCost(val)}
-                  prefix="Rp"
-                  className="bg-white"
-                  placeholder="0"
-                />
+                {/* LIVE CALCULATION SIMULATION BREAKDOWN */}
+                <div className="bg-slate-900 text-slate-100 p-4 rounded-xl space-y-3 shadow-inner">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="font-bold text-xs flex items-center gap-1.5 text-emerald-400">
+                      <Calculator className="w-4 h-4 text-emerald-400" />
+                      <span>Simulasi Live Perhitungan Stok &amp; HPP:</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {restockHppMethod === 'weighted_average' ? 'Weighted Average' : 'Last Purchase Price'}
+                    </span>
+                  </div>
+
+                  {/* Stock projection */}
+                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-800/80 p-2.5 rounded-lg border border-slate-700/80">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Penambahan Stok Dasar:</span>
+                      <span className="font-bold text-emerald-400">
+                        +{safeQty} {restockUnit} = +{formatNumberWithDots(baseAdded, isKgType || isLiterType)} {product.baseUnit}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Proyeksi Total Stok Master:</span>
+                      <span className="font-bold text-white">
+                        {formatNumberWithDots(currentStock, isKgType || isLiterType)} ➔ <strong className="text-emerald-300 text-xs">{formatNumberWithDots(newStock, isKgType || isLiterType)} {product.baseUnit}</strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* HPP Result Banner */}
+                  <div className="bg-emerald-950/70 border border-emerald-500/40 p-3 rounded-lg flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-emerald-300 block tracking-wider">
+                        HPP Master Baru ({product.baseUnit}):
+                      </span>
+                      <div className="flex items-baseline gap-2 mt-0.5">
+                        <span className="text-base font-black text-emerald-400">
+                          Rp {simulatedHppBase.toLocaleString('id-ID')}
+                        </span>
+                        <span className="text-[10px] text-slate-400 line-through">
+                          Rp {currentHppBase.toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      {hppDiff > 0 ? (
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
+                          <TrendingUp className="w-3 h-3 text-amber-400" />
+                          <span>+Rp {hppDiff.toLocaleString('id-ID')} (+{hppDiffPct}%)</span>
+                        </div>
+                      ) : hppDiff < 0 ? (
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                          <TrendingDown className="w-3 h-3 text-emerald-400" />
+                          <span>-Rp {Math.abs(hppDiff).toLocaleString('id-ID')} ({hppDiffPct}%)</span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                          Harga Tetap
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sub-unit HPP Breakdown according to 4 product types */}
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[10px] font-bold text-slate-300 block uppercase tracking-wider">
+                      Jabaran HPP Baru per Satuan &amp; Kemasan Turunan:
+                    </span>
+                    
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+                      {product.packagingVariants && product.packagingVariants.length > 0 ? (
+                        product.packagingVariants.map((v, vIdx) => {
+                          const newCost = Math.round(simulatedHppBase * (v.ratioToBase > 0 ? v.ratioToBase : 1));
+                          return (
+                            <div key={v.id || vIdx} className="bg-slate-800/90 border border-slate-700 px-2 py-1.5 rounded-lg">
+                              <span className="text-[10px] text-slate-400 block truncate">{v.name}:</span>
+                              <span className="font-bold text-white text-xs">Rp {newCost.toLocaleString('id-ID')}</span>
+                            </div>
+                          );
+                        })
+                      ) : isBoxType ? (
+                        <>
+                          <div className="bg-slate-800/90 border border-slate-700 px-2 py-1.5 rounded-lg">
+                            <span className="text-[10px] text-slate-400 block">Pcs (Satuan Dasar):</span>
+                            <span className="font-bold text-white text-xs">Rp {simulatedHppBase.toLocaleString('id-ID')}</span>
+                          </div>
+                          {product.rasioPcsPerRenceng && (
+                            <div className="bg-slate-800/90 border border-slate-700 px-2 py-1.5 rounded-lg">
+                              <span className="text-[10px] text-slate-400 block">Renceng ({product.rasioPcsPerRenceng} pcs):</span>
+                              <span className="font-bold text-white text-xs">Rp {(simulatedHppBase * product.rasioPcsPerRenceng).toLocaleString('id-ID')}</span>
+                            </div>
+                          )}
+                          {product.rasioRencengPerDus && product.rasioPcsPerRenceng && (
+                            <div className="bg-slate-800/90 border border-slate-700 px-2 py-1.5 rounded-lg col-span-2 sm:col-span-1">
+                              <span className="text-[10px] text-slate-400 block">Dus ({product.rasioRencengPerDus * product.rasioPcsPerRenceng} pcs):</span>
+                              <span className="font-bold text-white text-xs">Rp {(simulatedHppBase * product.rasioRencengPerDus * product.rasioPcsPerRenceng).toLocaleString('id-ID')}</span>
+                            </div>
+                          )}
+                        </>
+                      ) : isKgType ? (
+                        <>
+                          <div className="bg-slate-800/90 border border-slate-700 px-2 py-1.5 rounded-lg">
+                            <span className="text-[10px] text-slate-400 block">1 KG:</span>
+                            <span className="font-bold text-white text-xs">Rp {simulatedHppBase.toLocaleString('id-ID')}</span>
+                          </div>
+                          <div className="bg-slate-800/90 border border-slate-700 px-2 py-1.5 rounded-lg">
+                            <span className="text-[10px] text-slate-400 block">500 gram (1/2 kg):</span>
+                            <span className="font-bold text-white text-xs">Rp {Math.round(simulatedHppBase * 0.5).toLocaleString('id-ID')}</span>
+                          </div>
+                          <div className="bg-slate-800/90 border border-slate-700 px-2 py-1.5 rounded-lg">
+                            <span className="text-[10px] text-slate-400 block">250 gram (1/4 kg):</span>
+                            <span className="font-bold text-white text-xs">Rp {Math.round(simulatedHppBase * 0.25).toLocaleString('id-ID')}</span>
+                          </div>
+                          <div className="bg-slate-800/90 border border-slate-700 px-2 py-1.5 rounded-lg">
+                            <span className="text-[10px] text-slate-400 block">100 gram (1 ons):</span>
+                            <span className="font-bold text-white text-xs">Rp {Math.round(simulatedHppBase * 0.1).toLocaleString('id-ID')}</span>
+                          </div>
+                          {product.tierConfig?.tier3Ratio && (
+                            <div className="bg-slate-800/90 border border-slate-700 px-2 py-1.5 rounded-lg col-span-2">
+                              <span className="text-[10px] text-slate-400 block">{product.tierConfig.tier3Name || 'Karung'} ({product.tierConfig.tier3Ratio} kg):</span>
+                              <span className="font-bold text-white text-xs">Rp {Math.round(simulatedHppBase * product.tierConfig.tier3Ratio).toLocaleString('id-ID')}</span>
+                            </div>
+                          )}
+                        </>
+                      ) : isLiterType ? (
+                        <>
+                          <div className="bg-slate-800/90 border border-slate-700 px-2 py-1.5 rounded-lg">
+                            <span className="text-[10px] text-slate-400 block">1 Liter:</span>
+                            <span className="font-bold text-white text-xs">Rp {simulatedHppBase.toLocaleString('id-ID')}</span>
+                          </div>
+                          <div className="bg-slate-800/90 border border-slate-700 px-2 py-1.5 rounded-lg">
+                            <span className="text-[10px] text-slate-400 block">500 ml:</span>
+                            <span className="font-bold text-white text-xs">Rp {Math.round(simulatedHppBase * 0.5).toLocaleString('id-ID')}</span>
+                          </div>
+                          <div className="bg-slate-800/90 border border-slate-700 px-2 py-1.5 rounded-lg">
+                            <span className="text-[10px] text-slate-400 block">250 ml:</span>
+                            <span className="font-bold text-white text-xs">Rp {Math.round(simulatedHppBase * 0.25).toLocaleString('id-ID')}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="bg-slate-800/90 border border-slate-700 px-2 py-1.5 rounded-lg">
+                          <span className="text-[10px] text-slate-400 block">{product.baseUnit.toUpperCase()}:</span>
+                          <span className="font-bold text-white text-xs">Rp {simulatedHppBase.toLocaleString('id-ID')}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION 4: PENYESUAIAN HARGA JUAL OTOMATIS BERDASARKAN HPP BARU */}
+                <div className="bg-white border-2 border-emerald-400/80 rounded-2xl p-4 space-y-3.5 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-100 pb-2.5">
+                    <div>
+                      <div className="flex items-center gap-2 font-black text-slate-900 text-xs">
+                        <Coins className="w-4 h-4 text-emerald-600" />
+                        <span>Penyesuaian Harga Jual Satuan (Sinkron Real-time ke Kasir):</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        Otomatis hitung harga jual dengan margin untung dari HPP baru atau ketik nominal manual per level satuan.
+                      </p>
+                    </div>
+
+                    {/* Quick Preset Margin Buttons */}
+                    <div className="flex items-center gap-1.5 text-[10px]">
+                      <span className="text-slate-500 font-bold">Preset Margin:</span>
+                      {[10, 15, 20, 25, 30].map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => {
+                            // Update packagingVariants if present
+                            if (restockPackagingVariants.length > 0) {
+                              setRestockPackagingVariants((prev) =>
+                                prev.map((v) => {
+                                  const vCost = Math.round(simulatedHppBase * (v.ratioToBase > 0 ? v.ratioToBase : 1));
+                                  const vPrice = Math.round((vCost * (1 + pct / 100)) / (vCost < 2000 ? 50 : 100)) * (vCost < 2000 ? 50 : 100);
+                                  return { ...v, sellingPrice: vPrice, costPrice: vCost };
+                                })
+                              );
+                            }
+
+                            // Update KG
+                            if (isKgType) {
+                              const pKg = Math.round((simulatedHppBase * (1 + pct / 100)) / 100) * 100;
+                              const p500 = Math.round((simulatedHppBase * 0.5 * (1 + pct / 100)) / 100) * 100;
+                              const p250 = Math.round((simulatedHppBase * 0.25 * (1 + pct / 100)) / 100) * 100;
+                              const p100 = Math.round((simulatedHppBase * 0.1 * (1 + pct / 100)) / 50) * 50;
+                              setRestockHargaJualKg(pKg);
+                              setRestockHargaJualGram500(p500);
+                              setRestockHargaJualGram250(p250);
+                              setRestockHargaJualGram100(p100);
+                              setRestockPriceBase(pKg);
+                            }
+
+                            // Update Box / Wholesale
+                            if (isBoxType) {
+                              const pPcs = Math.round((simulatedHppBase * (1 + (pct + 10) / 100)) / 50) * 50;
+                              const pRenceng = pcsPerRenceng > 0 ? Math.round((simulatedHppBase * pcsPerRenceng * (1 + (pct + 5) / 100)) / 100) * 100 : 0;
+                              const pDus = totalPerDus > 0 ? Math.round((simulatedHppBase * totalPerDus * (1 + pct / 100)) / 500) * 500 : 0;
+                              setRestockHargaJualPcs(pPcs);
+                              setRestockHargaJualRenceng(pRenceng);
+                              setRestockHargaJualDus(pDus);
+                              setRestockPriceBase(pPcs);
+                            }
+
+                            // Update Liter
+                            if (isLiterType) {
+                              const pL = Math.round((simulatedHppBase * (1 + pct / 100)) / 100) * 100;
+                              setRestockPriceBase(pL);
+                            }
+
+                            // Standard Pcs
+                            if (!isKgType && !isBoxType && !isLiterType && restockPackagingVariants.length === 0) {
+                              const p = Math.round((simulatedHppBase * (1 + pct / 100)) / 50) * 50;
+                              setRestockPriceBase(p);
+                              setRestockHargaJualPcs(p);
+                            }
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white font-bold border border-emerald-300 transition shadow-2xs"
+                          title={`Terapkan margin +${pct}% ke semua harga jual`}
+                        >
+                          +{pct}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Detail Price Inputs based on Product Type */}
+                  <div className="space-y-2.5">
+                    {/* A. If product has Packaging Variants (Custom Variants or Box/Liter Packagings) */}
+                    {restockPackagingVariants.length > 0 ? (
+                      <div className="space-y-2">
+                        {restockPackagingVariants.map((v, vIdx) => {
+                          const vCost = Math.round(simulatedHppBase * (v.ratioToBase > 0 ? v.ratioToBase : 1));
+                          const vSelling = v.sellingPrice || 0;
+                          const profit = vSelling - vCost;
+                          const marginPct = vSelling > 0 ? Math.round((profit / vSelling) * 100) : 0;
+
+                          return (
+                            <div
+                              key={v.id || vIdx}
+                              className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center"
+                            >
+                              <div className="sm:col-span-4">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase block">Varian / Satuan</span>
+                                <span className="font-bold text-xs text-slate-900 block truncate">{v.name}</span>
+                                <span className="text-[9px] text-slate-400 block mt-0.5">
+                                  HPP Baru: <strong>Rp {vCost.toLocaleString('id-ID')}</strong>
+                                </span>
+                              </div>
+
+                              <div className="sm:col-span-4">
+                                <label className="text-[10px] font-bold text-emerald-900 block mb-0.5">Harga Jual Kasir (Rp):</label>
+                                <FormattedNumberInput
+                                  value={vSelling}
+                                  onChange={(val) => {
+                                    const updated = [...restockPackagingVariants];
+                                    updated[vIdx] = { ...updated[vIdx], sellingPrice: val };
+                                    setRestockPackagingVariants(updated);
+                                  }}
+                                  prefix="Rp"
+                                  className="bg-white font-black text-emerald-950 text-xs"
+                                />
+                              </div>
+
+                              <div className="sm:col-span-4">
+                                <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Laba Bersih &amp; Margin:</label>
+                                <div className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-bold flex items-center justify-between ${
+                                  profit >= 0 ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
+                                }`}>
+                                  <span>{profit >= 0 ? 'Untung:' : 'Rugi:'}</span>
+                                  <span className="font-mono">
+                                    {profit >= 0 ? `+Rp ${profit.toLocaleString('id-ID')} (${marginPct}%)` : `-Rp ${Math.abs(profit).toLocaleString('id-ID')}`}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : isKgType ? (
+                      /* B. KG Type (1 KG, 500g, 250g, 100g) */
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {/* 1 KG */}
+                        {(() => {
+                          const costKg = simulatedHppBase;
+                          const profitKg = restockHargaJualKg - costKg;
+                          const marginKg = restockHargaJualKg > 0 ? Math.round((profitKg / restockHargaJualKg) * 100) : 0;
+                          return (
+                            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-slate-900">1 KG (Pokok)</span>
+                                <span className="text-[10px] text-slate-500">HPP: Rp {costKg.toLocaleString('id-ID')}</span>
+                              </div>
+                              <FormattedNumberInput
+                                value={restockHargaJualKg}
+                                onChange={(val) => {
+                                  setRestockHargaJualKg(val);
+                                  setRestockPriceBase(val);
+                                }}
+                                prefix="Rp"
+                                className="bg-white font-black text-emerald-900 text-xs"
+                              />
+                              <div className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center justify-between ${
+                                profitKg >= 0 ? 'bg-emerald-100/70 text-emerald-900' : 'bg-red-100 text-red-700'
+                              }`}>
+                                <span>Laba per kg:</span>
+                                <span>{profitKg >= 0 ? `+Rp ${profitKg.toLocaleString('id-ID')} (${marginKg}%)` : `-Rp ${Math.abs(profitKg).toLocaleString('id-ID')}`}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* 500 Gram */}
+                        {(() => {
+                          const cost500 = Math.round(simulatedHppBase * 0.5);
+                          const profit500 = restockHargaJualGram500 - cost500;
+                          const margin500 = restockHargaJualGram500 > 0 ? Math.round((profit500 / restockHargaJualGram500) * 100) : 0;
+                          return (
+                            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-slate-900">500 Gram (1/2 kg)</span>
+                                <span className="text-[10px] text-slate-500">HPP: Rp {cost500.toLocaleString('id-ID')}</span>
+                              </div>
+                              <FormattedNumberInput
+                                value={restockHargaJualGram500}
+                                onChange={(val) => setRestockHargaJualGram500(val)}
+                                prefix="Rp"
+                                className="bg-white font-black text-emerald-900 text-xs"
+                              />
+                              <div className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center justify-between ${
+                                profit500 >= 0 ? 'bg-emerald-100/70 text-emerald-900' : 'bg-red-100 text-red-700'
+                              }`}>
+                                <span>Laba 500g:</span>
+                                <span>{profit500 >= 0 ? `+Rp ${profit500.toLocaleString('id-ID')} (${margin500}%)` : `-Rp ${Math.abs(profit500).toLocaleString('id-ID')}`}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* 250 Gram */}
+                        {(() => {
+                          const cost250 = Math.round(simulatedHppBase * 0.25);
+                          const profit250 = restockHargaJualGram250 - cost250;
+                          const margin250 = restockHargaJualGram250 > 0 ? Math.round((profit250 / restockHargaJualGram250) * 100) : 0;
+                          return (
+                            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-slate-900">250 Gram (1/4 kg)</span>
+                                <span className="text-[10px] text-slate-500">HPP: Rp {cost250.toLocaleString('id-ID')}</span>
+                              </div>
+                              <FormattedNumberInput
+                                value={restockHargaJualGram250}
+                                onChange={(val) => setRestockHargaJualGram250(val)}
+                                prefix="Rp"
+                                className="bg-white font-black text-emerald-900 text-xs"
+                              />
+                              <div className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center justify-between ${
+                                profit250 >= 0 ? 'bg-emerald-100/70 text-emerald-900' : 'bg-red-100 text-red-700'
+                              }`}>
+                                <span>Laba 250g:</span>
+                                <span>{profit250 >= 0 ? `+Rp ${profit250.toLocaleString('id-ID')} (${margin250}%)` : `-Rp ${Math.abs(profit250).toLocaleString('id-ID')}`}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* 100 Gram */}
+                        {(() => {
+                          const cost100 = Math.round(simulatedHppBase * 0.1);
+                          const profit100 = restockHargaJualGram100 - cost100;
+                          const margin100 = restockHargaJualGram100 > 0 ? Math.round((profit100 / restockHargaJualGram100) * 100) : 0;
+                          return (
+                            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-slate-900">100 Gram (1 Ons)</span>
+                                <span className="text-[10px] text-slate-500">HPP: Rp {cost100.toLocaleString('id-ID')}</span>
+                              </div>
+                              <FormattedNumberInput
+                                value={restockHargaJualGram100}
+                                onChange={(val) => setRestockHargaJualGram100(val)}
+                                prefix="Rp"
+                                className="bg-white font-black text-emerald-900 text-xs"
+                              />
+                              <div className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center justify-between ${
+                                profit100 >= 0 ? 'bg-emerald-100/70 text-emerald-900' : 'bg-red-100 text-red-700'
+                              }`}>
+                                <span>Laba 100g:</span>
+                                <span>{profit100 >= 0 ? `+Rp ${profit100.toLocaleString('id-ID')} (${margin100}%)` : `-Rp ${Math.abs(profit100).toLocaleString('id-ID')}`}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ) : isBoxType ? (
+                      /* C. Box / Wholesale without packagingVariants (Dus, Renceng, Pcs) */
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        {/* Dus */}
+                        {(() => {
+                          const costDus = Math.round(simulatedHppBase * totalPerDus);
+                          const profitDus = restockHargaJualDus - costDus;
+                          const marginDus = restockHargaJualDus > 0 ? Math.round((profitDus / restockHargaJualDus) * 100) : 0;
+                          return (
+                            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-slate-900">Dus ({totalPerDus} pcs)</span>
+                                <span className="text-[10px] text-slate-500">HPP: Rp {costDus.toLocaleString('id-ID')}</span>
+                              </div>
+                              <FormattedNumberInput
+                                value={restockHargaJualDus}
+                                onChange={(val) => setRestockHargaJualDus(val)}
+                                prefix="Rp"
+                                className="bg-white font-black text-emerald-900 text-xs"
+                              />
+                              <div className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center justify-between ${
+                                profitDus >= 0 ? 'bg-emerald-100/70 text-emerald-900' : 'bg-red-100 text-red-700'
+                              }`}>
+                                <span>Laba Dus:</span>
+                                <span>{profitDus >= 0 ? `+Rp ${profitDus.toLocaleString('id-ID')} (${marginDus}%)` : `-Rp ${Math.abs(profitDus).toLocaleString('id-ID')}`}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Renceng */}
+                        {(() => {
+                          const costRenceng = Math.round(simulatedHppBase * pcsPerRenceng);
+                          const profitRenceng = restockHargaJualRenceng - costRenceng;
+                          const marginRenceng = restockHargaJualRenceng > 0 ? Math.round((profitRenceng / restockHargaJualRenceng) * 100) : 0;
+                          return (
+                            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-slate-900">Renceng ({pcsPerRenceng} pcs)</span>
+                                <span className="text-[10px] text-slate-500">HPP: Rp {costRenceng.toLocaleString('id-ID')}</span>
+                              </div>
+                              <FormattedNumberInput
+                                value={restockHargaJualRenceng}
+                                onChange={(val) => setRestockHargaJualRenceng(val)}
+                                prefix="Rp"
+                                className="bg-white font-black text-emerald-900 text-xs"
+                              />
+                              <div className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center justify-between ${
+                                profitRenceng >= 0 ? 'bg-emerald-100/70 text-emerald-900' : 'bg-red-100 text-red-700'
+                              }`}>
+                                <span>Laba Renceng:</span>
+                                <span>{profitRenceng >= 0 ? `+Rp ${profitRenceng.toLocaleString('id-ID')} (${marginRenceng}%)` : `-Rp ${Math.abs(profitRenceng).toLocaleString('id-ID')}`}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Pcs */}
+                        {(() => {
+                          const costPcs = simulatedHppBase;
+                          const profitPcs = restockHargaJualPcs - costPcs;
+                          const marginPcs = restockHargaJualPcs > 0 ? Math.round((profitPcs / restockHargaJualPcs) * 100) : 0;
+                          return (
+                            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-slate-900">Pcs (Eceran)</span>
+                                <span className="text-[10px] text-slate-500">HPP: Rp {costPcs.toLocaleString('id-ID')}</span>
+                              </div>
+                              <FormattedNumberInput
+                                value={restockHargaJualPcs}
+                                onChange={(val) => {
+                                  setRestockHargaJualPcs(val);
+                                  setRestockPriceBase(val);
+                                }}
+                                prefix="Rp"
+                                className="bg-white font-black text-emerald-900 text-xs"
+                              />
+                              <div className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center justify-between ${
+                                profitPcs >= 0 ? 'bg-emerald-100/70 text-emerald-900' : 'bg-red-100 text-red-700'
+                              }`}>
+                                <span>Laba Pcs:</span>
+                                <span>{profitPcs >= 0 ? `+Rp ${profitPcs.toLocaleString('id-ID')} (${marginPcs}%)` : `-Rp ${Math.abs(profitPcs).toLocaleString('id-ID')}`}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ) : (
+                      /* D. Liter or Standard Pcs without packaging variants */
+                      (() => {
+                        const unitName = isLiterType ? '1 Liter' : `1 ${product.baseUnit.toUpperCase()}`;
+                        const cost = simulatedHppBase;
+                        const profit = restockPriceBase - cost;
+                        const margin = restockPriceBase > 0 ? Math.round((profit / restockPriceBase) * 100) : 0;
+                        return (
+                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-bold text-xs text-slate-900">{unitName}</span>
+                                <span className="text-[10px] text-slate-500">HPP Baru: Rp {cost.toLocaleString('id-ID')}</span>
+                              </div>
+                              <FormattedNumberInput
+                                value={restockPriceBase}
+                                onChange={(val) => {
+                                  setRestockPriceBase(val);
+                                  if (isKgType) setRestockHargaJualKg(val);
+                                  if (isBoxType) setRestockHargaJualPcs(val);
+                                }}
+                                prefix="Rp"
+                                className="bg-white font-black text-emerald-900 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-500 block mb-1">Analisis Margin Untung:</span>
+                              <div className={`px-3 py-2 rounded-lg border text-xs font-bold flex items-center justify-between ${
+                                profit >= 0 ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
+                              }`}>
+                                <span>{profit >= 0 ? 'Potensi Untung:' : 'Rugi:'}</span>
+                                <span className="font-mono">
+                                  {profit >= 0 ? `+Rp ${profit.toLocaleString('id-ID')} (${margin}%)` : `-Rp ${Math.abs(profit).toLocaleString('id-ID')}`}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    )}
+                  </div>
+                </div>
+
+                {/* Petty Cash Out Checkbox Option */}
+                <div className="bg-amber-50/70 border border-amber-200 p-3 rounded-xl flex items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    id="recordPettyCash"
+                    checked={restockRecordPettyCash}
+                    onChange={(e) => setRestockRecordPettyCash(e.target.checked)}
+                    className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4 shrink-0"
+                  />
+                  <label htmlFor="recordPettyCash" className="cursor-pointer">
+                    <span className="font-bold text-amber-950 block text-xs">
+                      Catat Otomatis ke Kas Toko (Pengeluaran Kas: Bayar Supplier)
+                    </span>
+                    <span className="text-[11px] text-amber-900 block mt-0.5">
+                      {restockRecordPettyCash 
+                        ? `Buku kas kasir akan mencatat pengeluaran sebesar Rp ${totalInvoice.toLocaleString('id-ID')} untuk pelunasan faktur supplier ini.`
+                        : 'Biaya pembelian ini tidak akan dicatat ke buku kas harian kasir (misal faktur dibayar via rekening bank terpisah).'}
+                    </span>
+                  </label>
+                </div>
+
+                {/* Restock Notes / DO / Supplier */}
+                <div>
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Catatan Restok &amp; Dokumen / DO Supplier:
+                  </label>
+                  <input
+                    type="text"
+                    value={restockNotes}
+                    onChange={(e) => setRestockNotes(e.target.value)}
+                    placeholder="Contoh: No. DO #88921 - Toko Agen Sembako Makmur"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  />
+                </div>
               </div>
 
-              {/* Notes */}
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Catatan Restok:
-                </label>
-                <input
-                  type="text"
-                  value={restockNotes}
-                  onChange={(e) => setRestockNotes(e.target.value)}
-                  placeholder="Nama supplier / nomor DO faktur"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs"
-                />
+              {/* MODAL FOOTER */}
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setRestockProductTarget(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-100 transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteRestock}
+                  disabled={safeQty <= 0}
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black shadow-xs transition active:scale-95 flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Konfirmasi Restok (+{formatNumberWithDots(baseAdded, isKgType || isLiterType)} {product.baseUnit})</span>
+                </button>
               </div>
-            </div>
 
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-2">
-              <button
-                onClick={() => setRestockProductTarget(null)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleExecuteRestock}
-                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs"
-              >
-                Konfirmasi Masuk Stok
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* REVAMPED INPUT / EDIT PRODUCT DATA MODAL FORM */}
       {isEditModalOpen && editingProduct && (
@@ -1149,6 +1962,37 @@ export const InventoryPage: React.FC = () => {
                 />
               </div>
 
+              {/* UNIVERSAL OPTIONAL SUB-VARIANTS TOGGLE */}
+              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                    editingProduct.enableSubVariants !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                  }`}>
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label htmlFor="enableSubVariantsToggle" className="font-extrabold text-slate-900 text-xs block cursor-pointer">
+                      [ ] Aktifkan Varian / Pecahan Turunan (Opsional)
+                    </label>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      {editingProduct.enableSubVariants !== false 
+                        ? 'Aktif: Menampilkan tombol pilihan harga pecahan (gram, renceng, 500ml, varian kemasan) di menu kasir.'
+                        : 'Non-aktif: Produk hanya dijual dalam 1 satuan utama (tanpa tombol pecahan di kasir).'}
+                    </p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    id="enableSubVariantsToggle"
+                    checked={editingProduct.enableSubVariants !== false}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, enableSubVariants: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-300 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+
               {/* FLOW A: KG / WEIGHT FORM (BARANG TIMBANGAN) */}
               {productType === 'kg' && (() => {
                 const stockKg = Number(editingProduct.stock || 0);
@@ -1164,10 +2008,16 @@ export const InventoryPage: React.FC = () => {
 
                 const applyMarginKg = (pct: number) => {
                   const targetPrice = Math.round((costPerKg * (1 + pct / 100)) / 100) * 100;
+                  const target500 = Math.round((cost500g * (1 + pct / 100)) / 100) * 100;
+                  const target250 = Math.round((cost250g * (1 + pct / 100)) / 100) * 100;
+                  const target100 = Math.round((cost100g * (1 + (pct + 5) / 100)) / 50) * 50;
                   setEditingProduct({
                     ...editingProduct,
                     priceBase: targetPrice,
                     hargaJualKg: targetPrice,
+                    hargaJualGram500: target500,
+                    hargaJualGram250: target250,
+                    hargaJualGram100: target100,
                   });
                 };
 
@@ -1410,6 +2260,7 @@ export const InventoryPage: React.FC = () => {
                           </div>
                         </div>
                       </div>
+
                     </div>
 
                     {/* DYNAMIC PACKAGING VARIANTS & PRESETS FOR KG */}
@@ -2195,6 +3046,13 @@ export const InventoryPage: React.FC = () => {
                             <span className="text-slate-500 font-semibold">Margin Acuan:</span>
                             <button
                               type="button"
+                              onClick={() => applyMarginPcs(10)}
+                              className="px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-bold border border-slate-200 transition"
+                            >
+                              +10% (Rp {Math.round((costPerPcs * 1.10) / 100) * 100})
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => applyMarginPcs(15)}
                               className="px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-bold border border-slate-200 transition"
                             >
@@ -2213,6 +3071,13 @@ export const InventoryPage: React.FC = () => {
                               className="px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-bold border border-slate-200 transition"
                             >
                               +25% (Rp {Math.round((costPerPcs * 1.25) / 100) * 100})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => applyMarginPcs(30)}
+                              className="px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-bold border border-slate-200 transition"
+                            >
+                              +30% (Rp {Math.round((costPerPcs * 1.30) / 100) * 100})
                             </button>
                           </div>
                         )}
@@ -2489,6 +3354,20 @@ export const InventoryPage: React.FC = () => {
                               className="px-2 py-0.5 rounded bg-slate-100 hover:bg-cyan-50 text-slate-700 hover:text-cyan-800 font-bold border border-slate-200 transition"
                             >
                               +20%
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => applyMarginLiter(25)}
+                              className="px-2 py-0.5 rounded bg-slate-100 hover:bg-cyan-50 text-slate-700 hover:text-cyan-800 font-bold border border-slate-200 transition"
+                            >
+                              +25%
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => applyMarginLiter(30)}
+                              className="px-2 py-0.5 rounded bg-slate-100 hover:bg-cyan-50 text-slate-700 hover:text-cyan-800 font-bold border border-slate-200 transition"
+                            >
+                              +30%
                             </button>
                           </div>
                         )}

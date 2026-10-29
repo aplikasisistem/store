@@ -80,6 +80,9 @@ export interface Product {
   // Centralized Retail Packaging Variants (e.g. 100g, 1/4 kg, 1/2 kg, 1 kg)
   packagingVariants?: RetailPackagingVariant[];
 
+  // Optional toggle flag to enable or disable sub-variants/fractions for this product
+  enableSubVariants?: boolean;
+
   imageUrl?: string;
   notes?: string;
   createdAt: string;
@@ -211,6 +214,8 @@ export interface CapitalLog {
   timestamp: string;
 }
 
+export type HppCalculationMethod = 'weighted_average' | 'last_price';
+
 export interface StockFlowLog {
   id: string;
   productId: string;
@@ -226,6 +231,13 @@ export interface StockFlowLog {
   referenceId?: string; // invoice or restock batch
   notes?: string;
   timestamp: string;
+
+  // Financial Audit Fields for Restock
+  unitCost?: number;             // Harga beli per originalUnit
+  totalCost?: number;            // Total faktur pembelian (qty * unitCost)
+  oldHppBase?: number;           // HPP modal dasar sebelum restok
+  newHppBase?: number;           // HPP modal dasar sesudah restok
+  hppMethod?: HppCalculationMethod; // Metode kalkulasi: 'weighted_average' | 'last_price'
 }
 
 export interface SystemSettings {
@@ -241,4 +253,18 @@ export interface SystemSettings {
   autoSyncGoogleSheets: boolean;
   soundEnabled: boolean;
   appVersion: string;
+}
+
+export interface ProductPriceUpdatePayload {
+  priceBase?: number;
+  hargaJualKg?: number;
+  hargaJualGram500?: number;
+  hargaJualGram250?: number;
+  hargaJualGram100?: number;
+  hargaJualDus?: number;
+  hargaJualRenceng?: number;
+  hargaJualPcs?: number;
+  tierConfig?: MultiTierUnitConfig;
+  packagingVariants?: RetailPackagingVariant[];
+  enableSubVariants?: boolean;
 }

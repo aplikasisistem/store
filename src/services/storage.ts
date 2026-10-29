@@ -446,6 +446,20 @@ class StorageService {
       isVariant?: boolean;
     }[] = [];
 
+    // 0. If sub-variants/fractions are explicitly disabled by user toggle, return ONLY the primary base unit
+    if (product.enableSubVariants === false) {
+      const price = product.hargaJualKg || product.hargaJualDus || product.hargaJualPcs || product.priceBase || 0;
+      const cost = product.costBase || 0;
+      const unitLabel = product.baseUnit === 'kg' ? '1 KG' : product.baseUnit === 'liter' ? '1 Liter' : product.baseUnit.toUpperCase();
+      return [{
+        unit: unitLabel,
+        ratio: 1,
+        price,
+        cost,
+        label: `${unitLabel} (Rp ${price.toLocaleString('id-ID')})`,
+      }];
+    }
+
     // 1. Centralized Retail Packaging Variants (e.g. Dus, Renceng, Pcs or 100g, 250g, 500g, 1kg)
     if (product.packagingVariants && product.packagingVariants.length > 0) {
       product.packagingVariants.forEach((v) => {
