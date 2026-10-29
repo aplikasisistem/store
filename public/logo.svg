@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#16a34a"/>
+      <stop offset="50%" stop-color="#15803d"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#facc15"/>
+      <stop offset="100%" stop-color="#eab308"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#064e3b" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded squircle for PWA icon -->
+  <rect width="512" height="512" rx="112" fill="url(#brandGrad)"/>
+
+  <!-- Subtle store awning pattern at top -->
+  <path d="M72 120 C120 120, 120 140, 168 140 C216 140, 216 120, 256 120 C296 120, 296 140, 344 140 C392 140, 392 120, 440 120 L440 96 C440 82.745 429.255 72 416 72 L96 72 C82.745 72 72 82.745 72 96 Z" fill="#ffffff" opacity="0.15"/>
+
+  <!-- Central Grocery Cart & Grain Motif with Drop Shadow -->
+  <g filter="url(#shadow)" transform="translate(106, 92)">
+    <!-- Cart Basket Frame -->
+    <path d="M30 40 L65 40 L105 190 L245 190 L275 80 L80 80" 
+          fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Grocery Goods Inside Basket -->
+    <!-- Bread / Rice Bag -->
+    <rect x="100" y="70" width="45" height="70" rx="8" fill="url(#accentGrad)"/>
+    <!-- Milk / Oil Bottle -->
+    <path d="M160 55 L190 55 L190 140 L160 140 Z" fill="#ffffff" opacity="0.95"/>
+    <rect x="168" y="42" width="14" height="13" rx="3" fill="#facc15"/>
+    <!-- Fresh Leaf / Sprout (Sembako Symbol) -->
+    <path d="M210 110 C210 70, 245 60, 245 60 C245 60, 245 95, 220 110 Z" fill="#4ade80"/>
+    <path d="M245 60 C220 80, 210 100, 210 110" stroke="#15803d" stroke-width="4" stroke-linecap="round"/>
+
+    <!-- Cart Basket Grid Lines -->
+    <line x1="100" y1="120" x2="265" y2="120" stroke="#ffffff" stroke-width="12" stroke-linecap="round" opacity="0.9"/>
+    <line x1="115" y1="155" x2="250" y2="155" stroke="#ffffff" stroke-width="12" stroke-linecap="round" opacity="0.9"/>
+    <line x1="140" y1="85" x2="130" y2="190" stroke="#ffffff" stroke-width="10" opacity="0.75"/>
+    <line x1="185" y1="85" x2="180" y2="190" stroke="#ffffff" stroke-width="10" opacity="0.75"/>
+    <line x1="230" y1="85" x2="225" y2="190" stroke="#ffffff" stroke-width="10" opacity="0.75"/>
+
+    <!-- Cart Wheels -->
+    <circle cx="120" cy="230" r="22" fill="#ffffff"/>
+    <circle cx="120" cy="230" r="10" fill="#0f766e"/>
+    <circle cx="230" cy="230" r="22" fill="#ffffff"/>
+    <circle cx="230" cy="230" r="10" fill="#0f766e"/>
+  </g>
+
+  <!-- Typography Banner PANDIR STORE -->
+  <g transform="translate(256, 400)" text-anchor="middle">
+    <!-- Outer Badge -->
+    <rect x="-180" y="-35" width="360" height="70" rx="20" fill="#ffffff" filter="url(#shadow)"/>
+    <text y="9" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-size="34" font-weight="900" fill="#0f766e" letter-spacing="3">PANDIR STORE</text>
+    <text y="28" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-size="13" font-weight="700" fill="#eab308" letter-spacing="2">SEMBAKO & POS</text>
+  </g>
+</svg>

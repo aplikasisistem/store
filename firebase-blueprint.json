@@ -1,0 +1,98 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Inventory product with multi-tier units and base stock in kg/pcs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 150 },
+        "category": { "type": "string", "maxLength": 50 },
+        "baseUnit": { "type": "string", "enum": ["kg", "pcs", "gram"] },
+        "stock": { "type": "number" },
+        "minStock": { "type": "number" },
+        "buyPrice": { "type": "number" },
+        "sellPrice": { "type": "number" },
+        "tiers": { "type": "array" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "category", "baseUnit", "stock", "sellPrice"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "POS checkout transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceNo": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "cashierId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "invoiceNo", "total", "cashierId", "createdAt"]
+    },
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Cashier or Admin user account",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "cashier"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "DebtRecord": {
+      "title": "DebtRecord",
+      "description": "Customer debt / Piutang record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "customerName", "amount"]
+    },
+    "FinanceRecord": {
+      "title": "FinanceRecord",
+      "description": "Income or expense finance record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "type", "amount"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Inventory products collection"
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "POS transactions collection"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserAccount" },
+      "description": "User accounts collection"
+    },
+    "/debts/{debtId}": {
+      "schema": { "$ref": "#/entities/DebtRecord" },
+      "description": "Customer debt collection"
+    },
+    "/finance/{financeId}": {
+      "schema": { "$ref": "#/entities/FinanceRecord" },
+      "description": "Finance records collection"
+    }
+  }
+}

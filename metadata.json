@@ -1,0 +1,6 @@
+{
+  "name": "PANDIR STORE - PWA POS & Manajemen Toko Sembako",
+  "description": "Sistem Kasir (POS) dan Manajemen Stok Multi-Satuan, Keuangan, Laba Rugi, Piutang, dan Closing Shift WhatsApp PANDIR STORE.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
