@@ -470,27 +470,50 @@ export const POSPage: React.FC = () => {
       );
 
       if (matched) {
-        const isMatchedWeighted = matched.baseUnit === 'kg' || matched.isWeighable || Boolean(matched.hargaJualKg);
-        if (!isMatchedWeighted && matched.packagingVariants && matched.packagingVariants.length > 0 && !multiplierMatch) {
+        const hasVariants = Boolean(
+          (matched.packagingVariants && matched.packagingVariants.length > 0) ||
+          (matched.tierConfig && (matched.tierConfig.tier2Name || matched.tierConfig.tier3Name)) ||
+          matched.baseUnit === 'kg' || matched.isWeighable || Boolean(matched.hargaJualKg)
+        );
+
+        if (hasVariants && !multiplierMatch) {
           handleOpenVariantModal(matched);
         } else {
-          const unitToUse = productSelectedUnits[matched.id] || (isMatchedWeighted ? '1 KG' : matched.baseUnit);
+          const unitToUse = productSelectedUnits[matched.id] || (matched.baseUnit === 'kg' ? '1 KG' : matched.baseUnit);
           handleAddToCart(matched, unitToUse, qty);
         }
         setSearchQuery('');
       } else if (filteredProducts.length === 1) {
         // Fallback to top filtered result if unique
         const topProd = filteredProducts[0];
-        const isTopWeighted = topProd.baseUnit === 'kg' || topProd.isWeighable || Boolean(topProd.hargaJualKg);
-        const unitToUse = productSelectedUnits[topProd.id] || (isTopWeighted ? '1 KG' : topProd.baseUnit);
-        handleAddToCart(topProd, unitToUse, qty);
+        const hasVariants = Boolean(
+          (topProd.packagingVariants && topProd.packagingVariants.length > 0) ||
+          (topProd.tierConfig && (topProd.tierConfig.tier2Name || topProd.tierConfig.tier3Name)) ||
+          topProd.baseUnit === 'kg' || topProd.isWeighable || Boolean(topProd.hargaJualKg)
+        );
+
+        if (hasVariants) {
+          handleOpenVariantModal(topProd);
+        } else {
+          const unitToUse = productSelectedUnits[topProd.id] || (topProd.baseUnit === 'kg' ? '1 KG' : topProd.baseUnit);
+          handleAddToCart(topProd, unitToUse, qty);
+        }
         setSearchQuery('');
       } else if (filteredProducts.length > 0 && highlightedIndex >= 0 && highlightedIndex < filteredProducts.length) {
         // Add highlighted product
         const highProd = filteredProducts[highlightedIndex];
-        const isHighWeighted = highProd.baseUnit === 'kg' || highProd.isWeighable || Boolean(highProd.hargaJualKg);
-        const unitToUse = productSelectedUnits[highProd.id] || (isHighWeighted ? '1 KG' : highProd.baseUnit);
-        handleAddToCart(highProd, unitToUse, qty);
+        const hasVariants = Boolean(
+          (highProd.packagingVariants && highProd.packagingVariants.length > 0) ||
+          (highProd.tierConfig && (highProd.tierConfig.tier2Name || highProd.tierConfig.tier3Name)) ||
+          highProd.baseUnit === 'kg' || highProd.isWeighable || Boolean(highProd.hargaJualKg)
+        );
+
+        if (hasVariants) {
+          handleOpenVariantModal(highProd);
+        } else {
+          const unitToUse = productSelectedUnits[highProd.id] || (highProd.baseUnit === 'kg' ? '1 KG' : highProd.baseUnit);
+          handleAddToCart(highProd, unitToUse, qty);
+        }
         setSearchQuery('');
       } else {
         sound.playWarningSound();
@@ -506,9 +529,19 @@ export const POSPage: React.FC = () => {
     );
 
     if (matched) {
-      handleAddToCart(matched, matched.baseUnit, 1, undefined, {
-        toastPrefix: 'Barcode ditemukan'
-      });
+      const hasVariants = Boolean(
+        (matched.packagingVariants && matched.packagingVariants.length > 0) ||
+        (matched.tierConfig && (matched.tierConfig.tier2Name || matched.tierConfig.tier3Name)) ||
+        matched.baseUnit === 'kg' || matched.isWeighable || Boolean(matched.hargaJualKg)
+      );
+
+      if (hasVariants) {
+        handleOpenVariantModal(matched);
+      } else {
+        handleAddToCart(matched, matched.baseUnit, 1, undefined, {
+          toastPrefix: 'Barcode ditemukan'
+        });
+      }
     } else {
       sound.playWarningSound();
       showVoiceToast(`Barcode "${code}" tidak terdaftar dalam stok produk.`);
