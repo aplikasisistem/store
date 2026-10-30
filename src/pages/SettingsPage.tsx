@@ -16,7 +16,8 @@ import {
   VolumeX, 
   Send,
   Save,
-  ShieldCheck
+  ShieldCheck,
+  Loader2
 } from 'lucide-react';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
 
@@ -135,10 +136,25 @@ export const SettingsPage: React.FC = () => {
     showToast('Data toko berhasil dipulihkan dari file backup!');
   };
 
-  const confirmResetData = () => {
-    resetAllData();
-    setIsResetModalOpen(false);
-    showToast('Data toko berhasil di-reset ke kondisi bawaan!');
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetConfirmInput, setResetConfirmInput] = useState('');
+
+  const confirmResetData = async () => {
+    if (resetConfirmInput.trim().toUpperCase() !== 'RESET') {
+      showToast('Ketik tulisan "RESET" untuk mengonfirmasi penghapusan data.');
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      showToast('Memulai proses penghapusan seluruh data cloud & storage...');
+      await resetAllData();
+      showToast('Reset data berhasil 100%! Halaman memuat ulang...');
+    } catch (err) {
+      console.error('[Reset Error]', err);
+      showToast('Terjadi kesalahan saat menghapus data.');
+      setIsResetting(false);
+    }
   };
 
   return (
@@ -249,7 +265,7 @@ export const SettingsPage: React.FC = () => {
                 type="text"
                 value={form.targetWhatsApp}
                 onChange={(e) => setForm({ ...form, targetWhatsApp: e.target.value })}
-                placeholder="085717046895"
+                placeholder=""
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono font-bold text-emerald-800"
                 required
               />
@@ -290,7 +306,7 @@ export const SettingsPage: React.FC = () => {
               type="url"
               value={form.gasWebhookUrl}
               onChange={(e) => setForm({ ...form, gasWebhookUrl: e.target.value })}
-              placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+              placeholder=""
               className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono text-[11px]"
             />
             <p className="text-[10px] text-slate-400 mt-1">
@@ -442,36 +458,84 @@ export const SettingsPage: React.FC = () => {
       {/* CUSTOM RESET DATA CONFIRMATION MODAL */}
       {isResetModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 relative">
+            
+            {/* Loading Overlay */}
+            {isResetting && (
+              <div className="absolute inset-0 z-20 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center space-y-3">
+                <Loader2 className="w-10 h-10 text-red-600 animate-spin" />
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm">Sedang Menghapus Data Toko...</h4>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Membersihkan database cloud (Firebase), localStorage, sessionStorage &amp; IndexedDB...
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-3 text-red-600">
               <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
                 <RefreshCw className="w-5 h-5 text-red-600" />
               </div>
               <div>
-                <h3 className="font-bold text-sm text-slate-900">Reset Seluruh Data Toko?</h3>
-                <p className="text-xs text-slate-500">Tindakan ini mengembalikan data ke kondisi bawaan</p>
+                <h3 className="font-bold text-sm text-slate-900">Konfirmasi Reset Seluruh Data Toko</h3>
+                <p className="text-xs text-slate-500">Zona Risiko Tinggi - Hapus Permanen</p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Apakah Anda yakin ingin me-reset <strong>SELURUH data toko</strong>? Riwayat transaksi, buku utang, pengeluaran kas, dan stok barang akan dikembalikan ke kondisi awal bawaan.
-            </p>
+            <div className="bg-red-50 border border-red-200 p-3 rounded-xl text-xs space-y-1.5 text-red-900 font-medium">
+              <div className="font-extrabold text-red-950 text-xs">Tindakan ini akan menghapus PERMANEN:</div>
+              <ul className="list-disc list-inside text-[11px] space-y-0.5 text-red-800 font-semibold">
+                <li>Seluruh dokumen Katalog Produk &amp; Varian Stok</li>
+                <li>Semua Riwayat Transaksi &amp; Penjualan Kasir</li>
+                <li>Buku Utang / Piutang Pelanggan</li>
+                <li>Laporan Closing Kasir &amp; Pengeluaran Kas</li>
+                <li>Cache Lokal (LocalStorage &amp; IndexedDB)</li>
+                <li>Database Cloud Server (Firebase Firestore)</li>
+              </ul>
+            </div>
+
+            {/* Double Confirmation Text Input Requirement */}
+            <div>
+              <label className="text-xs font-bold text-slate-800 block mb-1">
+                Ketik <span className="font-mono text-red-600 font-black">RESET</span> untuk mengonfirmasi:
+              </label>
+              <input
+                type="text"
+                value={resetConfirmInput}
+                onChange={(e) => setResetConfirmInput(e.target.value)}
+                placeholder=""
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono font-black text-red-700 text-xs focus:bg-white focus:ring-2 focus:ring-red-500 uppercase"
+                disabled={isResetting}
+              />
+            </div>
 
             <div className="flex gap-2.5 pt-2">
               <button
                 type="button"
-                onClick={() => setIsResetModalOpen(false)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-100 transition"
+                onClick={() => {
+                  if (!isResetting) {
+                    setIsResetModalOpen(false);
+                    setResetConfirmInput('');
+                  }
+                }}
+                disabled={isResetting}
+                className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-100 transition disabled:opacity-50"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={confirmResetData}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-xs transition active:scale-95 flex items-center justify-center gap-1.5"
+                disabled={isResetting || resetConfirmInput.trim().toUpperCase() !== 'RESET'}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-black shadow-xs transition active:scale-95 flex items-center justify-center gap-1.5"
               >
-                <RefreshCw className="w-4 h-4" />
-                <span>Ya, Reset Sekarang</span>
+                {isResetting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                <span>Ya, Hapus Permanen</span>
               </button>
             </div>
           </div>

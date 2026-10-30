@@ -128,7 +128,7 @@ Mohon dapat melakukan pelunasan sebelum jatuh tempo. Terima kasih banyak atas ke
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Cari nama pelanggan, nomor WA, atau no. invoice..."
+            placeholder=""
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
@@ -324,7 +324,7 @@ Mohon dapat melakukan pelunasan sebelum jatuh tempo. Terima kasih banyak atas ke
                   onChange={(val) => setPayAmount(val)}
                   max={activeDebt.remainingAmount}
                   prefix="Rp"
-                  placeholder="0"
+                  placeholder=""
                   className="bg-slate-50"
                   inputClassName="text-base font-black py-2.5"
                 />

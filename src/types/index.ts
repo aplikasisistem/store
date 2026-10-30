@@ -16,7 +16,7 @@ export interface UserAccount {
   updatedAt?: string;
 }
 
-export type UnitType = 'pcs' | 'saset' | 'bungkus' | 'pouch' | 'kg' | 'gram' | 'renteng' | 'dus' | 'karung' | 'peti' | 'liter' | 'botol';
+export type UnitType = 'pcs' | 'saset' | 'bungkus' | 'pouch' | 'kg' | 'gram' | 'renteng' | 'dus' | 'karung' | 'peti' | 'liter' | 'botol' | 'jerigen' | 'kaleng';
 
 export interface MultiTierUnitConfig {
   // Base unit is the smallest inventory tracking unit (e.g. 'pcs', 'saset', 'kg')
@@ -49,6 +49,7 @@ export interface Product {
   code: string; // SKU / Barcode, e.g. "BRG-001" or "899999123456"
   name: string;
   category: string;
+  productType?: 'kg' | 'box' | 'pcs' | 'liter'; // Saved unit classification type
   baseUnit: UnitType; // Master stock unit: 'kg', 'pcs', 'saset', etc.
   isWeighable?: boolean; // True for bulk goods (Beras, Gula, Telur, Bawang) sold in decimal kg/gram
   
@@ -64,6 +65,7 @@ export interface Product {
   // 3-Tier Multi-Unit Conversion (Box/Dus -> Strip/Renceng -> Pcs)
   rasioRencengPerDus?: number; // e.g. 48 Renceng per Dus
   rasioPcsPerRenceng?: number; // e.g. 12 Pcs per Renceng
+  rasioPcsPerDus?: number;     // Direct pcs per dus if configured
   hargaJualDus?: number;       // Selling price per Dus
   hargaJualRenceng?: number;   // Selling price per Strip / Renceng
   hargaJualPcs?: number;       // Selling price per Eceran Pcs

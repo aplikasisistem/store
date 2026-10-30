@@ -121,7 +121,7 @@ export const StockConversionCalculator: React.FC<StockConversionCalculatorProps>
                 value={packQuarterKg}
                 onChange={setPackQuarterKg}
                 suffix="pcs"
-                placeholder="0"
+                placeholder=""
                 className="bg-white"
               />
               <span className="text-[9px] text-emerald-700 font-bold block mt-0.5">
@@ -137,7 +137,7 @@ export const StockConversionCalculator: React.FC<StockConversionCalculatorProps>
                 value={packHalfKg}
                 onChange={setPackHalfKg}
                 suffix="pcs"
-                placeholder="0"
+                placeholder=""
                 className="bg-white"
               />
               <span className="text-[9px] text-emerald-700 font-bold block mt-0.5">
@@ -153,7 +153,7 @@ export const StockConversionCalculator: React.FC<StockConversionCalculatorProps>
                 value={packOneKg}
                 onChange={setPackOneKg}
                 suffix="pcs"
-                placeholder="0"
+                placeholder=""
                 className="bg-white"
               />
               <span className="text-[9px] text-emerald-700 font-bold block mt-0.5">
@@ -169,7 +169,7 @@ export const StockConversionCalculator: React.FC<StockConversionCalculatorProps>
                 value={packFiveKg}
                 onChange={setPackFiveKg}
                 suffix="pcs"
-                placeholder="0"
+                placeholder=""
                 className="bg-white"
               />
               <span className="text-[9px] text-emerald-700 font-bold block mt-0.5">
@@ -244,7 +244,7 @@ export const StockConversionCalculator: React.FC<StockConversionCalculatorProps>
               <FormattedNumberInput
                 value={countDus}
                 onChange={setCountDus}
-                placeholder="0"
+                placeholder=""
                 className="bg-white"
               />
             </div>
@@ -256,7 +256,7 @@ export const StockConversionCalculator: React.FC<StockConversionCalculatorProps>
               <FormattedNumberInput
                 value={ratioDusToRenceng}
                 onChange={setRatioDusToRenceng}
-                placeholder="10"
+                placeholder=""
                 className="bg-white"
               />
             </div>
@@ -268,7 +268,7 @@ export const StockConversionCalculator: React.FC<StockConversionCalculatorProps>
               <FormattedNumberInput
                 value={ratioRencengToPcs}
                 onChange={setRatioRencengToPcs}
-                placeholder="10"
+                placeholder=""
                 className="bg-white"
               />
             </div>
@@ -280,7 +280,7 @@ export const StockConversionCalculator: React.FC<StockConversionCalculatorProps>
               <FormattedNumberInput
                 value={countRenceng}
                 onChange={setCountRenceng}
-                placeholder="0"
+                placeholder=""
                 className="bg-white"
               />
             </div>
@@ -292,7 +292,7 @@ export const StockConversionCalculator: React.FC<StockConversionCalculatorProps>
               <FormattedNumberInput
                 value={countPcs}
                 onChange={setCountPcs}
-                placeholder="0"
+                placeholder=""
                 className="bg-white"
               />
             </div>

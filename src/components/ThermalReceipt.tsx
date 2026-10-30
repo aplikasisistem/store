@@ -242,7 +242,11 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({
             <div className="py-2.5 border-b border-dashed space-y-2" style={{ borderColor: '#e2e8f0' }}>
               {transaction.items.map((item, index) => (
                 <div key={index} className="text-[11px]">
-                  <div className="font-bold truncate">{item.productName}</div>
+                  <div className="font-bold truncate">
+                    {item.variantName && item.variantName.toLowerCase() !== 'pcs' && !item.productName.includes(item.variantName)
+                      ? `${item.productName} - ${item.variantName}`
+                      : item.productName}
+                  </div>
                   <div className="flex justify-between pl-2" style={{ color: '#475569' }}>
                     <span>
                       {item.quantity} {item.selectedUnit} x Rp {item.unitPrice.toLocaleString('id-ID')}

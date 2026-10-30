@@ -3,6 +3,7 @@ import {
   getFirestore, 
   Firestore, 
   enableIndexedDbPersistence, 
+  clearIndexedDbPersistence,
   collection, 
   doc, 
   setDoc, 
@@ -11,6 +12,7 @@ import {
   query,
   where,
   deleteDoc, 
+  writeBatch,
   onSnapshot, 
   Unsubscribe 
 } from 'firebase/firestore';
@@ -181,6 +183,66 @@ export async function deleteDocFromFirestore(collectionName: string, docId: stri
   } catch (err) {
     console.warn(`[Firebase] delete error on ${collectionName}/${docId}:`, err);
     return false;
+  }
+}
+
+/**
+ * Delete all documents in all operational collections from Cloud Firestore
+ */
+export async function clearAllFirestoreCollections(): Promise<{ success: boolean; deletedCount: number; error?: string }> {
+  const { isConfigured, db } = initFirebaseService();
+  if (db) {
+    try {
+      await clearIndexedDbPersistence(db);
+    } catch (e) {
+      console.warn('[Firebase] clearIndexedDbPersistence warning:', e);
+    }
+  }
+
+  if (!isConfigured || !db) {
+    return { success: true, deletedCount: 0 };
+  }
+
+  const collectionsToClear = [
+    'products',
+    'transactions',
+    'customer_debts',
+    'petty_cash_logs',
+    'closing_reports',
+    'capital_logs',
+    'stock_flow_logs',
+    'categories',
+    'settings',
+    'users',
+  ];
+
+  let totalDeleted = 0;
+
+  try {
+    for (const collectionName of collectionsToClear) {
+      const colRef = collection(db, collectionName);
+      const snapshot = await getDocs(colRef);
+      if (!snapshot.empty) {
+        const docs = snapshot.docs;
+        for (let i = 0; i < docs.length; i += 400) {
+          const chunk = docs.slice(i, i + 400);
+          const batch = writeBatch(db);
+          for (const d of chunk) {
+            batch.delete(d.ref);
+            totalDeleted++;
+          }
+          await batch.commit();
+        }
+      }
+    }
+    return { success: true, deletedCount: totalDeleted };
+  } catch (err) {
+    console.error('[Firebase Reset Error]', err);
+    return {
+      success: false,
+      deletedCount: totalDeleted,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 

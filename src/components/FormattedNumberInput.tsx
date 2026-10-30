@@ -24,7 +24,7 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
   allowDecimal = false,
   prefix,
   suffix,
-  placeholder = '0',
+  placeholder = '',
   className = '',
   inputClassName = '',
   disabled = false,
@@ -35,7 +35,7 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
   onKeyDown,
 }) => {
   const [displayValue, setDisplayValue] = useState<string>(() => {
-    if (value === undefined || value === null || (value === 0 && !placeholder)) return '';
+    if (value === undefined || value === null || value === 0) return '';
     return formatNumberWithDots(value, allowDecimal);
   });
 
@@ -48,7 +48,7 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
       return;
     }
 
-    if (value === undefined || value === null) {
+    if (value === undefined || value === null || value === 0) {
       setDisplayValue('');
     } else {
       setDisplayValue(formatNumberWithDots(value, allowDecimal));

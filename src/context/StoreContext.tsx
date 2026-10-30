@@ -14,7 +14,7 @@ import {
   ProductPriceUpdatePayload
 } from '../types';
 import { storage } from '../services/storage';
-import { sendToGoogleSheetsWebhook, getActiveFirebaseConfig } from '../services/firebase';
+import { sendToGoogleSheetsWebhook, getActiveFirebaseConfig, clearAllFirestoreCollections } from '../services/firebase';
 import { sound } from '../services/audio';
 
 interface CheckoutData {
@@ -102,7 +102,7 @@ interface StoreContextType {
   updateSettings: (newSettings: Partial<SystemSettings>) => void;
   syncAllToGoogleSheets: () => Promise<{ success: boolean; message: string }>;
   reloadAllData: () => void;
-  resetAllData: () => void;
+  resetAllData: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -829,10 +829,29 @@ Catatan Kasir       : ${notes || '-'}
     });
   };
 
-  const resetAllData = useCallback(() => {
-    storage.resetToDefaults();
-    reloadAllData();
-  }, [reloadAllData]);
+  const resetAllData = useCallback(async () => {
+    // 1. Delete all cloud database documents from Firestore
+    await clearAllFirestoreCollections();
+
+    // 2. Clear local storage, session storage, indexedDB, and set pandir_is_reset_done flag
+    await storage.resetToDefaults();
+
+    // 3. Clear all in-memory React state
+    setProducts([]);
+    setCategories([]);
+    setCart([]);
+    setTransactions([]);
+    setDebts([]);
+    setPettyCash([]);
+    setClosingReports([]);
+    setCapitalLogs([]);
+    setStockLogs([]);
+
+    // 4. Force reload page to guarantee clean listeners, state, and caches
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
+  }, []);
 
   return (
     <StoreContext.Provider

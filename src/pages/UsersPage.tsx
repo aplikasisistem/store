@@ -230,7 +230,7 @@ export const UsersPage: React.FC = () => {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Cari nama atau email akun..."
+            placeholder=""
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
@@ -400,7 +400,7 @@ export const UsersPage: React.FC = () => {
                   type="text"
                   value={newName}
                   onChange={(e) => { setNewName(e.target.value); setFormError(null); }}
-                  placeholder="Contoh: Rian Kasir Shift 2"
+                  placeholder=""
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-semibold"
                   required
                 />
@@ -412,7 +412,7 @@ export const UsersPage: React.FC = () => {
                   type="email"
                   value={newEmail}
                   onChange={(e) => { setNewEmail(e.target.value); setFormError(null); }}
-                  placeholder="Contoh: kasir2@pandirstore.com"
+                  placeholder=""
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono font-medium"
                   required
                 />
@@ -437,7 +437,7 @@ export const UsersPage: React.FC = () => {
                     type={showNewPassword ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => { setNewPassword(e.target.value); setFormError(null); }}
-                    placeholder="Minimal 6 karakter"
+                    placeholder=""
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-3 pr-10 py-2 font-mono text-xs"
                     required
                   />
@@ -498,7 +498,7 @@ export const UsersPage: React.FC = () => {
                     type={showResetPassword ? 'text' : 'password'}
                     value={updatedPassword}
                     onChange={(e) => setUpdatedPassword(e.target.value)}
-                    placeholder="Masukkan kata sandi baru"
+                    placeholder=""
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-3 pr-10 py-2 font-mono font-bold text-xs"
                     autoFocus
                   />

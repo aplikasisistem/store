@@ -63,13 +63,111 @@ export const InventoryPage: React.FC = () => {
   const [restockEnableSubVariants, setRestockEnableSubVariants] = useState<boolean>(true);
   const [restockShowPriceAdjust, setRestockShowPriceAdjust] = useState<boolean>(true);
 
-  // Add / Edit / Delete Product Modal State
-  const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+  // Add / Edit / Delete Product Modal State (Isolated per tab)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [productType, setProductType] = useState<'kg' | 'box' | 'pcs' | 'liter'>('kg');
+  const [productType, setProductType] = useState<'kg' | 'box' | 'pcs' | 'liter' | null>(null);
   const [deletingProductTarget, setDeletingProductTarget] = useState<Product | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Common product fields across all tabs
+  const [formCommon, setFormCommon] = useState<{
+    id?: string;
+    code: string;
+    name: string;
+    category: string;
+    minStockAlert: number;
+    enableSubVariants: boolean;
+  }>({
+    code: '',
+    name: '',
+    category: 'Beras & Tepung',
+    minStockAlert: 10,
+    enableSubVariants: true,
+  });
+
+  // Isolated tab form states
+  const [kgFormState, setKgFormState] = useState<{
+    stock: number;
+    totalPurchaseCost: number;
+    costBase: number;
+    priceBase: number;
+    hargaJualKg: number;
+    hargaJualGram500: number;
+    hargaJualGram250: number;
+    hargaJualGram100: number;
+    packagingVariants: RetailPackagingVariant[];
+  }>({
+    stock: 0,
+    totalPurchaseCost: 0,
+    costBase: 0,
+    priceBase: 0,
+    hargaJualKg: 0,
+    hargaJualGram500: 0,
+    hargaJualGram250: 0,
+    hargaJualGram100: 0,
+    packagingVariants: [],
+  });
+
+  const [boxFormState, setBoxFormState] = useState<{
+    boxSubUnitType: 'renceng' | 'pcs';
+    rasioRencengPerDus: number;
+    rasioPcsPerRenceng: number;
+    rasioPcsPerDus: number;
+    totalBoxes: number;
+    totalPurchaseCost: number;
+    costBase: number;
+    priceBase: number;
+    hargaJualDus: number;
+    hargaJualRenceng: number;
+    hargaJualPcs: number;
+    packagingVariants: RetailPackagingVariant[];
+  }>({
+    boxSubUnitType: 'renceng',
+    rasioRencengPerDus: 0,
+    rasioPcsPerRenceng: 0,
+    rasioPcsPerDus: 0,
+    totalBoxes: 0,
+    totalPurchaseCost: 0,
+    costBase: 0,
+    priceBase: 0,
+    hargaJualDus: 0,
+    hargaJualRenceng: 0,
+    hargaJualPcs: 0,
+    packagingVariants: [],
+  });
+
+  const [pcsFormState, setPcsFormState] = useState<{
+    baseUnit: UnitType;
+    stock: number;
+    totalPurchaseCost: number;
+    costBase: number;
+    priceBase: number;
+    packagingVariants: RetailPackagingVariant[];
+  }>({
+    baseUnit: 'pcs',
+    stock: 0,
+    totalPurchaseCost: 0,
+    costBase: 0,
+    priceBase: 0,
+    packagingVariants: [],
+  });
+
+  const [literFormState, setLiterFormState] = useState<{
+    baseUnit: UnitType;
+    stock: number;
+    totalPurchaseCost: number;
+    costBase: number;
+    priceBase: number;
+    packagingVariants: RetailPackagingVariant[];
+  }>({
+    baseUnit: 'liter',
+    stock: 0,
+    totalPurchaseCost: 0,
+    costBase: 0,
+    priceBase: 0,
+    packagingVariants: [],
+  });
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -153,27 +251,55 @@ export const InventoryPage: React.FC = () => {
   // Open New Product Form
   const handleOpenAddProduct = () => {
     setFormError(null);
-    setProductType('kg');
-    setEditingProduct({
+    setProductType(null);
+    setFormCommon({
       id: `prod-${Date.now()}`,
       code: `BRG-${(products.length + 1).toString().padStart(3, '0')}`,
       name: '',
       category: categories[0] || 'Beras & Tepung',
-      baseUnit: 'kg',
-      isWeighable: true,
+      minStockAlert: 0,
+      enableSubVariants: true,
+    });
+    setKgFormState({
       stock: 0,
-      minStockAlert: 10,
+      totalPurchaseCost: 0,
       costBase: 0,
       priceBase: 0,
-      totalPurchaseCost: 0,
       hargaJualKg: 0,
+      hargaJualGram500: 0,
+      hargaJualGram250: 0,
+      hargaJualGram100: 0,
       packagingVariants: [],
-      enableSubVariants: true,
-      tierConfig: {
-        baseUnit: 'kg',
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    });
+    setBoxFormState({
+      boxSubUnitType: 'renceng',
+      rasioRencengPerDus: 0,
+      rasioPcsPerRenceng: 0,
+      rasioPcsPerDus: 0,
+      totalBoxes: 0,
+      totalPurchaseCost: 0,
+      costBase: 0,
+      priceBase: 0,
+      hargaJualDus: 0,
+      hargaJualRenceng: 0,
+      hargaJualPcs: 0,
+      packagingVariants: [],
+    });
+    setPcsFormState({
+      baseUnit: 'pcs',
+      stock: 0,
+      totalPurchaseCost: 0,
+      costBase: 0,
+      priceBase: 0,
+      packagingVariants: [],
+    });
+    setLiterFormState({
+      baseUnit: 'liter',
+      stock: 0,
+      totalPurchaseCost: 0,
+      costBase: 0,
+      priceBase: 0,
+      packagingVariants: [],
     });
     setIsEditModalOpen(true);
   };
@@ -182,157 +308,334 @@ export const InventoryPage: React.FC = () => {
   const handleOpenEditProduct = (p: Product) => {
     setFormError(null);
     let initialType: 'kg' | 'box' | 'pcs' | 'liter' = 'pcs';
-    if (p.isWeighable || p.baseUnit === 'kg' || Boolean(p.hargaJualKg)) {
+
+    if (p.productType) {
+      initialType = p.productType;
+    } else if (
+      p.isWeighable ||
+      p.baseUnit === 'kg' ||
+      p.baseUnit === 'gram' ||
+      p.hargaJualKg !== undefined ||
+      (p.packagingVariants && p.packagingVariants.some((v) => v.unitLabel?.toLowerCase().includes('kg') || v.name?.toLowerCase().includes('kg') || v.name?.toLowerCase().includes('gram')))
+    ) {
       initialType = 'kg';
     } else if (
+      p.baseUnit === 'liter' ||
+      p.baseUnit === 'botol' ||
+      p.baseUnit === 'jerigen' ||
+      (p.packagingVariants && p.packagingVariants.some((v) => v.unitLabel?.toLowerCase().includes('liter') || v.name?.toLowerCase().includes('ml') || v.name?.toLowerCase().includes('liter')))
+    ) {
+      initialType = 'liter';
+    } else if (
       (p.rasioRencengPerDus && p.rasioPcsPerRenceng) ||
+      p.hargaJualDus !== undefined ||
+      p.hargaJualRenceng !== undefined ||
       p.tierConfig?.tier3Name === 'dus' ||
-      p.baseUnit === 'dus'
+      p.baseUnit === 'dus' ||
+      (p.packagingVariants && p.packagingVariants.some((v) => v.name?.toLowerCase().includes('dus') || v.name?.toLowerCase().includes('box') || v.name?.toLowerCase().includes('renceng') || v.name?.toLowerCase().includes('renteng')))
     ) {
       initialType = 'box';
-    } else if (p.baseUnit === 'liter') {
-      initialType = 'liter';
     } else {
       initialType = 'pcs';
     }
 
-    const renceng = p.rasioRencengPerDus || 48;
-    const pcs = p.rasioPcsPerRenceng || 12;
-    const totalPerDus = renceng * pcs;
-    const boxQty = totalPerDus > 0 ? Math.floor((p.stock || 0) / totalPerDus) : 0;
-    const boxHpp = p.tierConfig?.costTier3 || (p.costBase || 0) * totalPerDus;
-    const defaultTotalPurchaseCost = p.totalPurchaseCost !== undefined
-      ? p.totalPurchaseCost
-      : (initialType === 'box'
-          ? (boxQty > 0 ? boxQty * boxHpp : boxHpp)
-          : Math.round((p.stock || 0) * (p.costBase || 0)));
-
     setProductType(initialType);
-    setEditingProduct({
-      ...p,
+    setFormCommon({
+      id: p.id,
+      code: p.code,
+      name: p.name,
+      category: p.category,
+      minStockAlert: p.minStockAlert ?? 5,
       enableSubVariants: p.enableSubVariants !== false,
-      totalPurchaseCost: defaultTotalPurchaseCost,
     });
+
+    const pVariants = p.packagingVariants ? p.packagingVariants.map((v) => ({ ...v })) : [];
+
+    // Populate KG state
+    setKgFormState({
+      stock: initialType === 'kg' ? (p.stock || 0) : 0,
+      totalPurchaseCost: initialType === 'kg' ? (p.totalPurchaseCost || Math.round((p.stock || 0) * (p.costBase || 0))) : 0,
+      costBase: initialType === 'kg' ? (p.costBase || 0) : 0,
+      priceBase: initialType === 'kg' ? (p.priceBase || p.hargaJualKg || 0) : 0,
+      hargaJualKg: initialType === 'kg' ? (p.hargaJualKg ?? p.priceBase ?? 0) : 0,
+      hargaJualGram500: initialType === 'kg' ? (p.hargaJualGram500 ?? 0) : 0,
+      hargaJualGram250: initialType === 'kg' ? (p.hargaJualGram250 ?? 0) : 0,
+      hargaJualGram100: initialType === 'kg' ? (p.hargaJualGram100 ?? 0) : 0,
+      packagingVariants: initialType === 'kg' ? pVariants : [],
+    });
+
+    const renceng = p.rasioRencengPerDus || 0;
+    const pcs = p.rasioPcsPerRenceng || 0;
+    const subUnitType = (p.rasioRencengPerDus && p.rasioRencengPerDus > 0) ? 'renceng' : 'pcs';
+    const directPcsVal = p.tierConfig?.tier3Ratio || 0;
+    const totalPerDusVal = subUnitType === 'renceng' ? (renceng * pcs) : directPcsVal;
+    const totalBoxes = totalPerDusVal > 0 ? Math.floor((p.stock || 0) / totalPerDusVal) : 0;
+    const boxVariants = pVariants.map((v) => {
+      const u = (v.name || '').toUpperCase().trim();
+      let displayQty = v.ratioToBase || 1;
+      if (u === 'DUS' && totalPerDusVal > 0 && v.ratioToBase >= totalPerDusVal) {
+        displayQty = Math.round(v.ratioToBase / totalPerDusVal);
+      } else if (u === 'RENCENG' && pcs > 0 && v.ratioToBase >= pcs) {
+        displayQty = Math.round(v.ratioToBase / pcs);
+      }
+      return {
+        ...v,
+        ratioToBase: Math.max(1, displayQty),
+      };
+    });
+
+    setBoxFormState({
+      boxSubUnitType: subUnitType,
+      rasioRencengPerDus: renceng,
+      rasioPcsPerRenceng: pcs,
+      rasioPcsPerDus: directPcsVal,
+      totalBoxes: initialType === 'box' ? totalBoxes : 0,
+      totalPurchaseCost: initialType === 'box' ? (p.totalPurchaseCost || Math.round((p.stock || 0) * (p.costBase || 0))) : 0,
+      costBase: initialType === 'box' ? (p.costBase || 0) : 0,
+      priceBase: initialType === 'box' ? (p.priceBase || p.hargaJualPcs || 0) : 0,
+      hargaJualDus: initialType === 'box' ? (p.hargaJualDus || 0) : 0,
+      hargaJualRenceng: initialType === 'box' ? (p.hargaJualRenceng || 0) : 0,
+      hargaJualPcs: initialType === 'box' ? (p.hargaJualPcs || p.priceBase || 0) : 0,
+      packagingVariants: initialType === 'box' ? boxVariants : [],
+    });
+
+    // Populate PCS state
+    setPcsFormState({
+      baseUnit: (p.baseUnit as UnitType) || 'pcs',
+      stock: initialType === 'pcs' ? (p.stock || 0) : 0,
+      totalPurchaseCost: initialType === 'pcs' ? (p.totalPurchaseCost || Math.round((p.stock || 0) * (p.costBase || 0))) : 0,
+      costBase: initialType === 'pcs' ? (p.costBase || 0) : 0,
+      priceBase: initialType === 'pcs' ? (p.priceBase || 0) : 0,
+      packagingVariants: initialType === 'pcs' ? pVariants : [],
+    });
+
+    // Populate Liter state
+    setLiterFormState({
+      baseUnit: (p.baseUnit as UnitType) || 'liter',
+      stock: initialType === 'liter' ? (p.stock || 0) : 0,
+      totalPurchaseCost: initialType === 'liter' ? (p.totalPurchaseCost || Math.round((p.stock || 0) * (p.costBase || 0))) : 0,
+      costBase: initialType === 'liter' ? (p.costBase || 0) : 0,
+      priceBase: initialType === 'liter' ? (p.priceBase || 0) : 0,
+      packagingVariants: initialType === 'liter' ? pVariants : [],
+    });
+
     setIsEditModalOpen(true);
   };
 
-  // Switch Product Type Tabs (Step 1)
+  // Switch Product Type Tabs (Clean tab isolation - does NOT overwrite other tabs)
   const handleSelectProductType = (type: 'kg' | 'box' | 'pcs' | 'liter') => {
     setProductType(type);
-    if (!editingProduct) return;
-
-    // Reset base unit and flags
-    let baseUnit: UnitType = 'pcs';
-    let isWeighable = false;
-    let rasioRencengPerDus = editingProduct.rasioRencengPerDus;
-    let rasioPcsPerRenceng = editingProduct.rasioPcsPerRenceng;
-
-    if (type === 'kg') { 
-      baseUnit = 'kg'; 
-      isWeighable = true; 
-    } else if (type === 'liter') { 
-      baseUnit = 'liter'; 
-    } else if (type === 'box') {
-      baseUnit = 'pcs';
-      rasioRencengPerDus = rasioRencengPerDus || 48;
-      rasioPcsPerRenceng = rasioPcsPerRenceng || 12;
-    }
-
-    setEditingProduct({
-      ...editingProduct,
-      baseUnit,
-      isWeighable,
-      rasioRencengPerDus,
-      rasioPcsPerRenceng,
-      tierConfig: { ...editingProduct.tierConfig, baseUnit },
-    });
   };
 
   // Generate SKU Code Automatically
   const handleGenerateAutoSku = () => {
-    if (!editingProduct) return;
     const nextNum = products.length + 1;
     const newSku = `BRG-${nextNum.toString().padStart(3, '0')}`;
-    setEditingProduct({
-      ...editingProduct,
+    setFormCommon((prev) => ({
+      ...prev,
       code: newSku,
-    });
+    }));
   };
 
   const handleSaveProductForm = () => {
-    if (!editingProduct?.name || !editingProduct?.name.trim() || !editingProduct?.code || !editingProduct?.code.trim()) {
+    if (!formCommon.name || !formCommon.name.trim() || !formCommon.code || !formCommon.code.trim()) {
       setFormError('Nama produk dan Kode Barang (SKU) wajib diisi.');
       return;
     }
     setFormError(null);
 
-    const variants = editingProduct.packagingVariants || [];
+    let prodToSave: Product;
 
-    // Backward-compatibility and fallback mapping for Dus, Renceng, Pcs
-    let hargaJualDus = editingProduct.hargaJualDus;
-    let hargaJualRenceng = editingProduct.hargaJualRenceng;
-    let hargaJualPcs = editingProduct.hargaJualPcs;
-    let priceBase = Number(editingProduct.priceBase || 0);
-
-    if (productType === 'box' && variants.length > 0) {
-      const dusVar = variants.find((v) => v.name.toLowerCase().trim() === 'dus' || v.name.toLowerCase().includes('dus') || v.name.toLowerCase().includes('box'));
-      const rencengVar = variants.find((v) => v.name.toLowerCase().trim() === 'renceng' || v.name.toLowerCase().includes('renceng') || v.name.toLowerCase().includes('renteng'));
-      const pcsVar = variants.find((v) => v.name.toLowerCase().trim() === 'pcs' || v.ratioToBase === 1);
-      
-      if (dusVar && dusVar.sellingPrice > 0) hargaJualDus = dusVar.sellingPrice;
-      if (rencengVar && rencengVar.sellingPrice > 0) hargaJualRenceng = rencengVar.sellingPrice;
-      if (pcsVar && pcsVar.sellingPrice > 0) {
-        hargaJualPcs = pcsVar.sellingPrice;
-        priceBase = pcsVar.sellingPrice;
-      } else if (!priceBase && variants[0]?.sellingPrice) {
-        priceBase = variants[0].sellingPrice;
+    if (productType === 'kg') {
+      const variants = kgFormState.packagingVariants || [];
+      let pBase = Number(kgFormState.priceBase || kgFormState.hargaJualKg || 0);
+      if (pBase <= 0 && variants.length > 0) {
+        const oneKgVar = variants.find(v => Math.abs(v.ratioToBase - 1) < 0.0001 || v.name.toLowerCase().includes('1 kg'));
+        if (oneKgVar && oneKgVar.sellingPrice > 0) {
+          pBase = oneKgVar.sellingPrice;
+        } else {
+          const first = variants[0];
+          if (first && first.ratioToBase > 0 && first.sellingPrice > 0) {
+            pBase = Math.round(first.sellingPrice / first.ratioToBase);
+          }
+        }
       }
-    }
+      const hargaJualKgFinal = Number(kgFormState.hargaJualKg || pBase || 0);
 
-    const prodToSave = {
-      ...editingProduct,
-      name: editingProduct.name.trim(),
-      code: editingProduct.code.trim(),
-      stock: Number(editingProduct.stock || 0),
-      minStockAlert: Number(editingProduct.minStockAlert || 5),
-      costBase: Number(editingProduct.costBase || 0),
-      totalPurchaseCost: Number(editingProduct.totalPurchaseCost || 0),
-      priceBase: priceBase,
-      hargaJualDus,
-      hargaJualRenceng,
-      hargaJualPcs,
-      enableSubVariants: editingProduct.enableSubVariants !== false,
-      // Ensure unit specific fields are kept based on type. Allow undefined for optional tiers.
-      hargaJualKg: productType === 'kg' ? (editingProduct.hargaJualKg ? Number(editingProduct.hargaJualKg) : priceBase) : undefined,
-      packagingVariants: editingProduct.packagingVariants || [],
-    } as Product;
+      prodToSave = {
+        id: formCommon.id || `prod-${Date.now()}`,
+        code: formCommon.code.trim(),
+        name: formCommon.name.trim(),
+        category: formCommon.category,
+        productType: 'kg',
+        baseUnit: 'kg',
+        isWeighable: true,
+        stock: Number(kgFormState.stock || 0),
+        minStockAlert: Number(formCommon.minStockAlert || 5),
+        costBase: Number(kgFormState.costBase || 0),
+        totalPurchaseCost: Number(kgFormState.totalPurchaseCost || 0),
+        priceBase: pBase,
+        hargaJualKg: hargaJualKgFinal,
+        hargaJualGram500: kgFormState.hargaJualGram500,
+        hargaJualGram250: kgFormState.hargaJualGram250,
+        hargaJualGram100: kgFormState.hargaJualGram100,
+        enableSubVariants: formCommon.enableSubVariants,
+        packagingVariants: variants,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Product;
+    } else if (productType === 'box') {
+      const isRencengMode = boxFormState.boxSubUnitType === 'renceng';
+      const renceng = isRencengMode ? Math.max(0, Number(boxFormState.rasioRencengPerDus) || 0) : 0;
+      const pcs = isRencengMode 
+        ? Math.max(0, Number(boxFormState.rasioPcsPerRenceng) || 0) 
+        : Math.max(0, Number(boxFormState.rasioPcsPerDus) || 0);
+      const totalPerDus = isRencengMode ? (renceng * pcs) : pcs;
+      const totalBoxes = Math.max(0, Number(boxFormState.totalBoxes) || 0);
+      const totalPcs = totalBoxes * totalPerDus;
+      const totalCost = Math.max(0, Number(boxFormState.totalPurchaseCost) || 0);
+      const costPerPcs = totalPcs > 0 && totalCost > 0 ? Math.round(totalCost / totalPcs) : Number(boxFormState.costBase || 0);
+      const boxCost = totalBoxes > 0 && totalCost > 0 ? Math.round(totalCost / totalBoxes) : (costPerPcs * totalPerDus);
+      const pcsPerRenceng = isRencengMode ? pcs : 0;
+      const costPerRenceng = isRencengMode && pcsPerRenceng > 0 ? (costPerPcs * pcsPerRenceng) : 0;
+      const pricePcs = Number(boxFormState.priceBase || boxFormState.hargaJualPcs || 0);
+
+      const variants = boxFormState.packagingVariants || [];
+      let hargaJualDus = boxFormState.hargaJualDus;
+      let hargaJualRenceng = boxFormState.hargaJualRenceng;
+      let hargaJualPcs = boxFormState.hargaJualPcs || pricePcs;
+
+      if (variants.length > 0) {
+        const dusVar = variants.find((v) => v.name.toLowerCase().trim() === 'dus' || v.name.toLowerCase().includes('dus') || v.name.toLowerCase().includes('box'));
+        const rencengVar = variants.find((v) => v.name.toLowerCase().trim() === 'renceng' || v.name.toLowerCase().includes('renceng') || v.name.toLowerCase().includes('renteng'));
+        const pcsVar = variants.find((v) => v.name.toLowerCase().trim() === 'pcs' || v.ratioToBase === 1);
+
+        if (dusVar && dusVar.sellingPrice > 0) hargaJualDus = dusVar.sellingPrice;
+        if (rencengVar && rencengVar.sellingPrice > 0) hargaJualRenceng = rencengVar.sellingPrice;
+        if (pcsVar && pcsVar.sellingPrice > 0) hargaJualPcs = pcsVar.sellingPrice;
+      }
+
+      const sanitizedBoxVariants = variants.map((v) => {
+        const u = (v.name || '').toUpperCase().trim();
+        const qty = Math.max(1, Number(v.ratioToBase) || 1);
+        let unitCost = 0;
+        let pcsRatio = qty;
+
+        if (u === 'DUS' || u.includes('DUS') || u.includes('BOX') || u.includes('KARTON')) {
+          unitCost = boxCost > 0 ? boxCost : (totalPerDus > 0 ? costPerPcs * totalPerDus : costPerPcs);
+          pcsRatio = totalPerDus > 0 ? qty * totalPerDus : qty;
+        } else if (u === 'RENCENG' || u.includes('RENCENG') || u.includes('RENTENG')) {
+          unitCost = costPerRenceng > 0 ? costPerRenceng : (pcsPerRenceng > 0 ? costPerPcs * pcsPerRenceng : costPerPcs);
+          pcsRatio = pcsPerRenceng > 0 ? qty * pcsPerRenceng : qty;
+        } else if (u === 'PCS' || u.includes('PCS') || u.includes('BIJI') || u.includes('BUAH')) {
+          unitCost = costPerPcs;
+          pcsRatio = qty;
+        } else if (u === 'PACK 6') {
+          unitCost = costPerPcs * 6;
+          pcsRatio = qty * 6;
+        } else if (u === 'PACK 12' || u.includes('LUSIN')) {
+          unitCost = costPerPcs * 12;
+          pcsRatio = qty * 12;
+        } else if (u === 'PACK 24' || u.includes('KODI')) {
+          unitCost = costPerPcs * 24;
+          pcsRatio = qty * 24;
+        } else {
+          unitCost = costPerPcs;
+          pcsRatio = qty;
+        }
+
+        const cPrice = qty * unitCost;
+
+        return {
+          ...v,
+          ratioToBase: pcsRatio,
+          costPrice: cPrice,
+        };
+      });
+
+      prodToSave = {
+        id: formCommon.id || `prod-${Date.now()}`,
+        code: formCommon.code.trim(),
+        name: formCommon.name.trim(),
+        category: formCommon.category,
+        productType: 'box',
+        baseUnit: 'pcs',
+        isWeighable: false,
+        stock: totalPcs,
+        minStockAlert: Number(formCommon.minStockAlert || 0),
+        costBase: costPerPcs,
+        totalPurchaseCost: totalCost,
+        priceBase: hargaJualPcs,
+        hargaJualDus,
+        hargaJualRenceng,
+        hargaJualPcs,
+        rasioRencengPerDus: renceng,
+        rasioPcsPerRenceng: isRencengMode ? pcs : 0,
+        enableSubVariants: formCommon.enableSubVariants,
+        packagingVariants: sanitizedBoxVariants,
+        tierConfig: {
+          baseUnit: 'pcs',
+          tier3Name: 'dus',
+          tier3Ratio: totalPerDus,
+          costTier3: boxCost,
+          ...(isRencengMode ? {
+            tier2Name: 'renceng',
+            tier2Ratio: pcs,
+            costTier2: costPerPcs * pcs,
+          } : {}),
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Product;
+    } else if (productType === 'liter') {
+      const pBase = Number(literFormState.priceBase || 0);
+      prodToSave = {
+        id: formCommon.id || `prod-${Date.now()}`,
+        code: formCommon.code.trim(),
+        name: formCommon.name.trim(),
+        category: formCommon.category,
+        productType: 'liter',
+        baseUnit: literFormState.baseUnit || 'liter',
+        isWeighable: false,
+        stock: Number(literFormState.stock || 0),
+        minStockAlert: Number(formCommon.minStockAlert || 0),
+        costBase: Number(literFormState.costBase || 0),
+        totalPurchaseCost: Number(literFormState.totalPurchaseCost || 0),
+        priceBase: pBase,
+        enableSubVariants: formCommon.enableSubVariants,
+        packagingVariants: literFormState.packagingVariants,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Product;
+    } else {
+      // PCS / Retail
+      const pBase = Number(pcsFormState.priceBase || 0);
+      prodToSave = {
+        id: formCommon.id || `prod-${Date.now()}`,
+        code: formCommon.code.trim(),
+        name: formCommon.name.trim(),
+        category: formCommon.category,
+        productType: 'pcs',
+        baseUnit: pcsFormState.baseUnit || 'pcs',
+        isWeighable: false,
+        stock: Number(pcsFormState.stock || 0),
+        minStockAlert: Number(formCommon.minStockAlert || 0),
+        costBase: Number(pcsFormState.costBase || 0),
+        totalPurchaseCost: Number(pcsFormState.totalPurchaseCost || 0),
+        priceBase: pBase,
+        enableSubVariants: formCommon.enableSubVariants,
+        packagingVariants: pcsFormState.packagingVariants,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Product;
+    }
 
     saveProduct(prodToSave);
     setIsEditModalOpen(false);
-    setEditingProduct(null);
     showToast(`Data produk "${prodToSave.name}" berhasil disimpan!`);
   };
 
-  const addPackagingVariantPreset = (type: string, ratio: number, defaultName: string) => {
-    if (!editingProduct) return;
-    const existing = editingProduct.packagingVariants || [];
-    const basePrice = editingProduct.priceBase || 15000;
-    let suggestedPrice = Math.round((basePrice * ratio) / 100) * 100;
-    if (suggestedPrice < 500) suggestedPrice = 1000;
-    
-    const newVariant: RetailPackagingVariant = {
-      id: `var-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      name: defaultName,
-      ratioToBase: ratio,
-      unitLabel: editingProduct.baseUnit || 'Pcs',
-      sellingPrice: suggestedPrice,
-      costPrice: Math.round(((editingProduct.costBase || 0) * ratio) / 100) * 100,
-    };
-    setEditingProduct({
-      ...editingProduct,
-      packagingVariants: [...existing, newVariant],
-    });
-  };
+
 
   return (
     <div className="max-w-7xl mx-auto p-3 sm:p-5 space-y-4 pb-24 lg:pb-6">
@@ -401,7 +704,7 @@ export const InventoryPage: React.FC = () => {
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Cari nama barang atau kode SKU..."
+                placeholder=""
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white"
@@ -964,8 +1267,8 @@ export const InventoryPage: React.FC = () => {
           product.baseUnit === 'dus' || 
           (product.packagingVariants?.some(v => v.name.toLowerCase().includes('dus')));
 
-        const rencengPerDus = product.rasioRencengPerDus || 48;
-        const pcsPerRenceng = product.rasioPcsPerRenceng || 10;
+        const rencengPerDus = product.rasioRencengPerDus || 0;
+        const pcsPerRenceng = product.rasioPcsPerRenceng || 0;
         const totalPerDus = rencengPerDus * pcsPerRenceng;
 
         const isKgType = product.isWeighable || product.baseUnit === 'kg' || Boolean(product.hargaJualKg);
@@ -1074,7 +1377,7 @@ export const InventoryPage: React.FC = () => {
                       allowDecimal={isKgType || isLiterType || restockUnit === 'kg'}
                       suffix={restockUnit}
                       className="bg-white font-bold"
-                      placeholder="1"
+                      placeholder=""
                     />
                   </div>
                 </div>
@@ -1096,7 +1399,7 @@ export const InventoryPage: React.FC = () => {
                     onChange={(val) => setRestockCost(Math.max(0, val))}
                     prefix="Rp"
                     className="bg-white font-black text-slate-900 text-sm"
-                    placeholder="0"
+                    placeholder=""
                   />
                   <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-900 pt-0.5">
                     <span>Total Faktur Pembelian:</span>
@@ -1636,7 +1939,7 @@ export const InventoryPage: React.FC = () => {
                           return (
                             <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
                               <div className="flex items-center justify-between">
-                                <span className="font-bold text-xs text-slate-900">Pcs (Eceran)</span>
+                                <span className="font-bold text-xs text-slate-900">Dus (Eceran)</span>
                                 <span className="text-[10px] text-slate-500">HPP: Rp {costPcs.toLocaleString('id-ID')}</span>
                               </div>
                               <FormattedNumberInput
@@ -1731,7 +2034,7 @@ export const InventoryPage: React.FC = () => {
                     type="text"
                     value={restockNotes}
                     onChange={(e) => setRestockNotes(e.target.value)}
-                    placeholder="Contoh: No. DO #88921 - Toko Agen Sembako Makmur"
+                    placeholder=""
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                   />
                 </div>
@@ -1763,7 +2066,7 @@ export const InventoryPage: React.FC = () => {
       })()}
 
       {/* REVAMPED INPUT / EDIT PRODUCT DATA MODAL FORM */}
-      {isEditModalOpen && editingProduct && (
+      {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
             
@@ -1772,7 +2075,7 @@ export const InventoryPage: React.FC = () => {
               <div>
                 <h3 className="font-black text-sm text-white flex items-center gap-2">
                   <PackagePlus className="w-4 h-4 text-emerald-400" />
-                  <span>{editingProduct.id?.includes('prod-') ? 'Input Data Produk Baru' : 'Edit Data Produk'}</span>
+                  <span>{formCommon.id?.includes('prod-') ? 'Input Data Produk Baru' : 'Edit Data Produk'}</span>
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">
                   Formulir terpadu input produk sembako &amp; konversi rasio satuan terpusat
@@ -1787,113 +2090,144 @@ export const InventoryPage: React.FC = () => {
             </div>
 
             {/* STEP 1: PRIMARY UNIT / VARIANT TYPE SELECTION */}
-            <div className="bg-slate-100 p-3.5 border-b border-slate-200">
-              <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 block mb-2 flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-emerald-600" />
-                <span>1. Pilih Tipe &amp; Satuan Utama Produk:</span>
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                
-                {/* [KG / Weight] Tab */}
-                <button
-                  type="button"
-                  onClick={() => handleSelectProductType('kg')}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
-                    productType === 'kg'
-                      ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm ring-2 ring-emerald-400/50'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <Scale className={`w-4 h-4 ${productType === 'kg' ? 'text-white' : 'text-emerald-600'}`} />
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      productType === 'kg' ? 'bg-emerald-700/80 text-white' : 'bg-emerald-50 text-emerald-700'
-                    }`}>
-                      KG / Gram
-                    </span>
-                  </div>
-                  <div className="font-black text-xs">KG / Weight</div>
-                  <div className={`text-[10px] mt-0.5 ${productType === 'kg' ? 'text-emerald-100' : 'text-slate-500'}`}>
-                    Barang Timbangan
-                  </div>
-                </button>
+            {productType === null && (
+              <div className="bg-slate-100 p-3.5 border-b border-slate-200">
+                <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 block mb-2">
+                  Pilih Tipe Satuan Utama:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  
+                  {/* [KG / Weight] Tab */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectProductType('kg')}
+                    className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                      productType === 'kg'
+                        ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm ring-2 ring-emerald-400/50'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <Scale className={`w-4 h-4 ${productType === 'kg' ? 'text-white' : 'text-emerald-600'}`} />
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        productType === 'kg' ? 'bg-emerald-700/80 text-white' : 'bg-emerald-50 text-emerald-700'
+                      }`}>
+                        KG / Gram
+                      </span>
+                    </div>
+                    <div className="font-black text-xs">KG / Weight</div>
+                    <div className={`text-[10px] mt-0.5 ${productType === 'kg' ? 'text-emerald-100' : 'text-slate-500'}`}>
+                      Barang Timbangan
+                    </div>
+                  </button>
 
-                {/* [BOX / Wholesale (Dus)] Tab */}
-                <button
-                  type="button"
-                  onClick={() => handleSelectProductType('box')}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
-                    productType === 'box'
-                      ? 'bg-amber-600 text-white border-amber-700 shadow-sm ring-2 ring-amber-400/50'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <Boxes className={`w-4 h-4 ${productType === 'box' ? 'text-white' : 'text-amber-600'}`} />
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      productType === 'box' ? 'bg-amber-700/80 text-white' : 'bg-amber-50 text-amber-700'
-                    }`}>
-                      Grosir Dus
-                    </span>
-                  </div>
-                  <div className="font-black text-xs">BOX / Wholesale</div>
-                  <div className={`text-[10px] mt-0.5 ${productType === 'box' ? 'text-amber-100' : 'text-slate-500'}`}>
-                    Dus &amp; Renteng
-                  </div>
-                </button>
+                  {/* [BOX / Wholesale (Dus)] Tab */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectProductType('box')}
+                    className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                      productType === 'box'
+                        ? 'bg-amber-600 text-white border-amber-700 shadow-sm ring-2 ring-amber-400/50'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <Boxes className={`w-4 h-4 ${productType === 'box' ? 'text-white' : 'text-amber-600'}`} />
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        productType === 'box' ? 'bg-amber-700/80 text-white' : 'bg-amber-50 text-amber-700'
+                      }`}>
+                        Grosir Dus
+                      </span>
+                    </div>
+                    <div className="font-black text-xs">BOX / Wholesale</div>
+                    <div className={`text-[10px] mt-0.5 ${productType === 'box' ? 'text-amber-100' : 'text-slate-500'}`}>
+                      Dus &amp; Renteng
+                    </div>
+                  </button>
 
-                {/* [PCS / Retail] Tab */}
-                <button
-                  type="button"
-                  onClick={() => handleSelectProductType('pcs')}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
-                    productType === 'pcs'
-                      ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-400/50'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <Package className={`w-4 h-4 ${productType === 'pcs' ? 'text-white' : 'text-blue-600'}`} />
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      productType === 'pcs' ? 'bg-blue-700/80 text-white' : 'bg-blue-50 text-blue-700'
-                    }`}>
-                      Eceran Unit
-                    </span>
-                  </div>
-                  <div className="font-black text-xs">PCS / Retail</div>
-                  <div className={`text-[10px] mt-0.5 ${productType === 'pcs' ? 'text-blue-100' : 'text-slate-500'}`}>
-                    Pcs / Bungkus
-                  </div>
-                </button>
+                  {/* [PCS / Retail] Tab */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectProductType('pcs')}
+                    className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                      productType === 'pcs'
+                        ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-400/50'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <Package className={`w-4 h-4 ${productType === 'pcs' ? 'text-white' : 'text-blue-600'}`} />
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        productType === 'pcs' ? 'bg-blue-700/80 text-white' : 'bg-blue-50 text-blue-700'
+                      }`}>
+                        Eceran Unit
+                      </span>
+                    </div>
+                    <div className="font-black text-xs">PCS / Retail</div>
+                    <div className={`text-[10px] mt-0.5 ${productType === 'pcs' ? 'text-blue-100' : 'text-slate-500'}`}>
+                      Pcs / Bungkus
+                    </div>
+                  </button>
 
-                {/* [LITER / Liquid] Tab */}
-                <button
-                  type="button"
-                  onClick={() => handleSelectProductType('liter')}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
-                    productType === 'liter'
-                      ? 'bg-cyan-600 text-white border-cyan-700 shadow-sm ring-2 ring-cyan-400/50'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <Droplets className={`w-4 h-4 ${productType === 'liter' ? 'text-white' : 'text-cyan-600'}`} />
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      productType === 'liter' ? 'bg-cyan-700/80 text-white' : 'bg-cyan-50 text-cyan-700'
-                    }`}>
-                      Barang Cair
-                    </span>
-                  </div>
-                  <div className="font-black text-xs">LITER / Liquid</div>
-                  <div className={`text-[10px] mt-0.5 ${productType === 'liter' ? 'text-cyan-100' : 'text-slate-500'}`}>
-                    Liter &amp; Botol
-                  </div>
-                </button>
+                  {/* [LITER / Liquid] Tab */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectProductType('liter')}
+                    className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                      productType === 'liter'
+                        ? 'bg-cyan-600 text-white border-cyan-700 shadow-sm ring-2 ring-cyan-400/50'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <Droplets className={`w-4 h-4 ${productType === 'liter' ? 'text-white' : 'text-cyan-600'}`} />
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        productType === 'liter' ? 'bg-cyan-700/80 text-white' : 'bg-cyan-50 text-cyan-700'
+                      }`}>
+                        Barang Cair
+                      </span>
+                    </div>
+                    <div className="font-black text-xs">LITER / Liquid</div>
+                    <div className={`text-[10px] mt-0.5 ${productType === 'liter' ? 'text-cyan-100' : 'text-slate-500'}`}>
+                      Liter &amp; Botol
+                    </div>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* STEP 2: DYNAMIC INPUT FLOW BASED ON SELECTED TYPE */}
-            <div className="p-5 overflow-y-auto space-y-4 text-xs max-h-[65vh]">
+            {productType === null ? (
+              <div className="p-8 text-center space-y-3 bg-slate-50/70 rounded-2xl border-2 border-dashed border-slate-200 m-5 animate-in fade-in duration-200">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto shadow-xs">
+                  <Layers className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-extrabold text-slate-800 text-sm">Pilih Tipe &amp; Satuan Utama Produk</h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    Klik salah satu dari 4 pilihan tombol di atas (<strong>KG / Weight</strong>, <strong>BOX / Wholesale</strong>, <strong>PCS / Retail</strong>, atau <strong>LITER / Liquid</strong>) untuk membuka formulir input detail.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-5 overflow-y-auto space-y-4 text-xs max-h-[65vh] animate-in fade-in duration-300">
+
+              {/* Selected Unit Indicator & Back to Selection Option */}
+              <div className="bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                  <span>Satuan Utama Aktif:</span>
+                  <span className="bg-emerald-600 text-white px-2 py-0.5 rounded uppercase font-black text-[10px]">
+                    {productType}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProductType(null)}
+                  className="text-[11px] font-bold text-emerald-800 hover:text-emerald-950 underline"
+                >
+                  ← Ganti Tipe Satuan
+                </button>
+              </div>
 
               {/* Form Error Banner */}
               {formError && (
@@ -1919,10 +2253,10 @@ export const InventoryPage: React.FC = () => {
                   </div>
                   <input
                     type="text"
-                    value={editingProduct.code || ''}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, code: e.target.value })}
+                    value={formCommon.code}
+                    onChange={(e) => setFormCommon({ ...formCommon, code: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500"
-                    placeholder="BRG-009"
+                    placeholder=""
                     required
                   />
                 </div>
@@ -1930,8 +2264,8 @@ export const InventoryPage: React.FC = () => {
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Kategori Sembako:</label>
                   <select
-                    value={editingProduct.category || categories[0]}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                    value={formCommon.category}
+                    onChange={(e) => setFormCommon({ ...formCommon, category: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500"
                   >
                     {categories.map((c) => (
@@ -1946,8 +2280,8 @@ export const InventoryPage: React.FC = () => {
                 <label className="font-bold text-slate-700 block mb-1">Nama Produk / Barang:</label>
                 <input
                   type="text"
-                  value={editingProduct.name || ''}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                  value={formCommon.name}
+                  onChange={(e) => setFormCommon({ ...formCommon, name: e.target.value })}
                   placeholder={
                     productType === 'kg'
                       ? 'Contoh: Beras Rojo Lele Super / Minyak Goreng Curah'
@@ -1966,7 +2300,7 @@ export const InventoryPage: React.FC = () => {
               <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
                 <div className="flex items-center gap-2.5">
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                    editingProduct.enableSubVariants !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                    formCommon.enableSubVariants ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
                   }`}>
                     <Layers className="w-4 h-4" />
                   </div>
@@ -1975,7 +2309,7 @@ export const InventoryPage: React.FC = () => {
                       [ ] Aktifkan Varian / Pecahan Turunan (Opsional)
                     </label>
                     <p className="text-[10px] text-slate-500 mt-0.5">
-                      {editingProduct.enableSubVariants !== false 
+                      {formCommon.enableSubVariants 
                         ? 'Aktif: Menampilkan tombol pilihan harga pecahan (gram, renceng, 500ml, varian kemasan) di menu kasir.'
                         : 'Non-aktif: Produk hanya dijual dalam 1 satuan utama (tanpa tombol pecahan di kasir).'}
                     </p>
@@ -1985,8 +2319,8 @@ export const InventoryPage: React.FC = () => {
                   <input
                     type="checkbox"
                     id="enableSubVariantsToggle"
-                    checked={editingProduct.enableSubVariants !== false}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, enableSubVariants: e.target.checked })}
+                    checked={formCommon.enableSubVariants}
+                    onChange={(e) => setFormCommon({ ...formCommon, enableSubVariants: e.target.checked })}
                     className="sr-only peer"
                   />
                   <div className="w-9 h-5 bg-slate-300 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
@@ -1995,14 +2329,14 @@ export const InventoryPage: React.FC = () => {
 
               {/* FLOW A: KG / WEIGHT FORM (BARANG TIMBANGAN) */}
               {productType === 'kg' && (() => {
-                const stockKg = Number(editingProduct.stock || 0);
-                const totalCost = Number(editingProduct.totalPurchaseCost || 0);
-                const costPerKg = Number(editingProduct.costBase || 0);
+                const stockKg = Number(kgFormState.stock || 0);
+                const totalCost = Number(kgFormState.totalPurchaseCost || 0);
+                const costPerKg = Number(kgFormState.costBase || 0);
                 const cost500g = Math.round(costPerKg * 0.5);
                 const cost250g = Math.round(costPerKg * 0.25);
                 const cost100g = Math.round(costPerKg * 0.1);
                 const cost1g = costPerKg > 0 ? (costPerKg / 1000) : 0;
-                const sellingPriceKg = Number(editingProduct.priceBase || editingProduct.hargaJualKg || 0);
+                const sellingPriceKg = Number(kgFormState.priceBase || kgFormState.hargaJualKg || 0);
                 const profitPerKg = sellingPriceKg - costPerKg;
                 const marginPctKg = sellingPriceKg > 0 ? Math.round((profitPerKg / sellingPriceKg) * 100) : 0;
 
@@ -2011,13 +2345,32 @@ export const InventoryPage: React.FC = () => {
                   const target500 = Math.round((cost500g * (1 + pct / 100)) / 100) * 100;
                   const target250 = Math.round((cost250g * (1 + pct / 100)) / 100) * 100;
                   const target100 = Math.round((cost100g * (1 + (pct + 5) / 100)) / 50) * 50;
-                  setEditingProduct({
-                    ...editingProduct,
+                  setKgFormState({
+                    ...kgFormState,
                     priceBase: targetPrice,
                     hargaJualKg: targetPrice,
                     hargaJualGram500: target500,
                     hargaJualGram250: target250,
                     hargaJualGram100: target100,
+                  });
+                };
+
+                const addKgVariantPreset = (ratio: number, defaultName: string) => {
+                  const existing = kgFormState.packagingVariants || [];
+                  let suggestedPrice = Math.round((sellingPriceKg * ratio) / 100) * 100;
+                  if (suggestedPrice < 500) suggestedPrice = 1000;
+
+                  const newVariant: RetailPackagingVariant = {
+                    id: `var-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                    name: defaultName,
+                    ratioToBase: ratio,
+                    unitLabel: 'Gram',
+                    sellingPrice: suggestedPrice,
+                    costPrice: Math.round(costPerKg * ratio),
+                  };
+                  setKgFormState({
+                    ...kgFormState,
+                    packagingVariants: [...existing, newVariant],
                   });
                 };
 
@@ -2048,15 +2401,15 @@ export const InventoryPage: React.FC = () => {
                               const newCost = totalCost > 0 && newStock > 0
                                 ? Math.round(totalCost / newStock)
                                 : costPerKg;
-                              setEditingProduct({
-                                ...editingProduct,
+                              setKgFormState({
+                                ...kgFormState,
                                 stock: newStock,
                                 costBase: newCost,
                               });
                             }}
                             allowDecimal={true}
                             suffix="kg"
-                            placeholder="50"
+                            placeholder=""
                             className="bg-white font-black text-slate-900"
                           />
                           <span className="text-[10px] text-slate-500 mt-1 block">
@@ -2076,14 +2429,14 @@ export const InventoryPage: React.FC = () => {
                               const newCost = stockKg > 0
                                 ? Math.round(newTotal / stockKg)
                                 : costPerKg;
-                              setEditingProduct({
-                                ...editingProduct,
+                              setKgFormState({
+                                ...kgFormState,
                                 totalPurchaseCost: newTotal,
                                 costBase: newCost,
                               });
                             }}
                             prefix="Rp"
-                            placeholder="650000"
+                            placeholder=""
                             className="bg-white font-black text-slate-900"
                           />
                           <span className="text-[10px] text-slate-500 mt-1 block">
@@ -2101,14 +2454,14 @@ export const InventoryPage: React.FC = () => {
                             onChange={(val) => {
                               const newCost = Math.max(0, val);
                               const newTotal = stockKg > 0 ? Math.round(stockKg * newCost) : totalCost;
-                              setEditingProduct({
-                                ...editingProduct,
+                              setKgFormState({
+                                ...kgFormState,
                                 costBase: newCost,
                                 totalPurchaseCost: newTotal,
                               });
                             }}
                             prefix="Rp"
-                            placeholder="13000"
+                            placeholder=""
                             className="bg-emerald-50 border-emerald-300 font-black text-emerald-950"
                           />
                           <span className="text-[10px] text-emerald-700 mt-1 block font-medium">
@@ -2120,159 +2473,18 @@ export const InventoryPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* LIVE AUTOMATIC CONVERSION DOWNWARD BREAKDOWN (PER 500G, 250G, 100G, PER GRAM) */}
-                    <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-2xs space-y-3">
-                      <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
-                        <div className="flex items-center gap-1.5 font-black text-slate-900 text-xs">
-                          <Calculator className="w-4 h-4 text-emerald-600" />
-                          <span>2. Konversi Otomatis Rincian Modal ke Bawah (Per Gram):</span>
-                        </div>
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                          Presisi Real-time
-                        </span>
-                      </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-                        {/* 1 kg */}
-                        <div className="bg-emerald-50/80 p-2.5 rounded-xl border border-emerald-200 text-center">
-                          <span className="text-[10px] font-bold text-emerald-800 block uppercase">Per 1 KG</span>
-                          <span className="text-xs sm:text-sm font-black text-emerald-950 mt-0.5 block">
-                            Rp {costPerKg.toLocaleString('id-ID')}
-                          </span>
-                          <span className="text-[9px] text-emerald-600 block mt-0.5">Modal Pokok (1.000g)</span>
-                        </div>
 
-                        {/* 500g */}
-                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-center">
-                          <span className="text-[10px] font-bold text-slate-600 block uppercase">Per 500g (1/2 kg)</span>
-                          <span className="text-xs sm:text-sm font-black text-slate-900 mt-0.5 block">
-                            Rp {cost500g.toLocaleString('id-ID')}
-                          </span>
-                          <span className="text-[9px] text-slate-500 block mt-0.5">Rumus: HPP &times; 0.5</span>
-                        </div>
-
-                        {/* 250g */}
-                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-center">
-                          <span className="text-[10px] font-bold text-slate-600 block uppercase">Per 250g (1/4 kg)</span>
-                          <span className="text-xs sm:text-sm font-black text-slate-900 mt-0.5 block">
-                            Rp {cost250g.toLocaleString('id-ID')}
-                          </span>
-                          <span className="text-[9px] text-slate-500 block mt-0.5">Rumus: HPP &times; 0.25</span>
-                        </div>
-
-                        {/* 100g */}
-                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-center">
-                          <span className="text-[10px] font-bold text-slate-600 block uppercase">Per 100g (1 Ons)</span>
-                          <span className="text-xs sm:text-sm font-black text-slate-900 mt-0.5 block">
-                            Rp {cost100g.toLocaleString('id-ID')}
-                          </span>
-                          <span className="text-[9px] text-slate-500 block mt-0.5">Rumus: HPP &times; 0.1</span>
-                        </div>
-
-                        {/* 1 Gram */}
-                        <div className="col-span-2 sm:col-span-1 bg-amber-50/70 p-2.5 rounded-xl border border-amber-200 text-center">
-                          <span className="text-[10px] font-bold text-amber-800 block uppercase">Per 1 Gram</span>
-                          <span className="text-xs sm:text-sm font-black text-amber-950 mt-0.5 block">
-                            Rp {cost1g > 0 ? cost1g.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : '0'}
-                          </span>
-                          <span className="text-[9px] text-amber-600 block mt-0.5">Rumus: HPP &divide; 1.000</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* SELLING PRICE PER 1 KG & REAL-TIME PROFIT */}
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
-                        <div className="flex items-center gap-1.5 font-black text-slate-900 text-xs">
-                          <Coins className="w-4 h-4 text-emerald-600" />
-                          <span>3. Harga Jual Eceran Pokok per 1 kg:</span>
-                        </div>
-                        {costPerKg > 0 && (
-                          <div className="flex items-center gap-1.5 text-[10px]">
-                            <span className="text-slate-500 font-semibold">Preset Margin:</span>
-                            <button
-                              type="button"
-                              onClick={() => applyMarginKg(10)}
-                              className="px-2 py-0.5 rounded bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 font-bold border border-slate-200 transition"
-                            >
-                              +10%
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => applyMarginKg(15)}
-                              className="px-2 py-0.5 rounded bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 font-bold border border-slate-200 transition"
-                            >
-                              +15%
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => applyMarginKg(20)}
-                              className="px-2 py-0.5 rounded bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 font-bold border border-slate-200 transition"
-                            >
-                              +20%
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => applyMarginKg(25)}
-                              className="px-2 py-0.5 rounded bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 font-bold border border-slate-200 transition"
-                            >
-                              +25%
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                        <div>
-                          <label className="font-bold text-slate-800 block mb-1">
-                            Harga Jual per 1 kg (Rp):
-                          </label>
-                          <FormattedNumberInput
-                            value={sellingPriceKg}
-                            onChange={(val) => {
-                              setEditingProduct({
-                                ...editingProduct,
-                                priceBase: val,
-                                hargaJualKg: val,
-                              });
-                            }}
-                            prefix="Rp"
-                            placeholder="15000"
-                            className="bg-white font-black text-emerald-900"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 block mb-1">
-                            Analisis Laba Penjualan per 1 kg:
-                          </label>
-                          <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-bold ${
-                            profitPerKg >= 0 
-                              ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900' 
-                              : 'bg-red-50 border-red-200 text-red-700'
-                          }`}>
-                            <span>{profitPerKg >= 0 ? 'Potensi Keuntungan:' : 'Perhatian Rugi:'}</span>
-                            <span className="font-mono">
-                              {profitPerKg >= 0 
-                                ? `+Rp ${profitPerKg.toLocaleString('id-ID')} (${marginPctKg}%)` 
-                                : `-Rp ${Math.abs(profitPerKg).toLocaleString('id-ID')}`}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                    </div>
-
-                    {/* DYNAMIC PACKAGING VARIANTS & PRESETS FOR KG */}
+                    {/* PURE WEIGHABLE PACKAGING VARIANTS FOR KG */}
                     <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
                         <div>
                           <div className="font-black text-slate-900 flex items-center gap-1.5 text-xs">
                             <Package className="w-4 h-4 text-amber-600" />
-                            <span>4. Varian Kemasan Eceran Timbangan (Siap Pakai di Kasir)</span>
+                            <span>3. Varian Kemasan Eceran Timbangan (Siap Pakai di Kasir)</span>
                           </div>
                           <p className="text-[10px] text-slate-500 mt-0.5">
-                            Satuan eceran kemasan plastik/bungkus. Stok master kg berkurang otomatis saat terjual.
+                            Satuan eceran kemasan plastik/bungkus. Penjualan produk sepenuhnya bersumber dari varian custom di bawah ini.
                           </p>
                         </div>
 
@@ -2283,13 +2495,13 @@ export const InventoryPage: React.FC = () => {
                               id: `var-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
                               name: 'Kemasan Custom',
                               ratioToBase: 0.25,
-                              unitLabel: 'Bungkus',
-                              sellingPrice: Math.round((costPerKg * 0.25 * 1.2) / 100) * 100 || 4000,
+                              unitLabel: 'Gram',
+                              sellingPrice: Math.round((costPerKg * 0.25 * 1.2) / 100) * 100 || 0,
                               costPrice: Math.round(costPerKg * 0.25),
                             };
-                            setEditingProduct({
-                              ...editingProduct,
-                              packagingVariants: [...(editingProduct.packagingVariants || []), newVariant],
+                            setKgFormState({
+                              ...kgFormState,
+                              packagingVariants: [...(kgFormState.packagingVariants || []), newVariant],
                             });
                           }}
                           className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition shadow-2xs"
@@ -2304,38 +2516,38 @@ export const InventoryPage: React.FC = () => {
                         <span className="text-[10px] font-bold text-slate-500">Preset Cepat:</span>
                         <button
                           type="button"
-                          onClick={() => addPackagingVariantPreset('100g', 0.1, 'Kemasan 100g (1 Ons)')}
+                          onClick={() => addKgVariantPreset(0.1, 'Kemasan 100g (1 Ons)')}
                           className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-[10px] font-bold transition shadow-2xs"
                         >
                           + 100g (1 Ons)
                         </button>
                         <button
                           type="button"
-                          onClick={() => addPackagingVariantPreset('250g', 0.25, 'Kemasan 1/4 kg (250g)')}
+                          onClick={() => addKgVariantPreset(0.25, 'Kemasan 1/4 kg (250g)')}
                           className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-[10px] font-bold transition shadow-2xs"
                         >
                           + 1/4 kg (250g)
                         </button>
                         <button
                           type="button"
-                          onClick={() => addPackagingVariantPreset('500g', 0.5, 'Kemasan 1/2 kg (500g)')}
+                          onClick={() => addKgVariantPreset(0.5, 'Kemasan 1/2 kg (500g)')}
                           className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-[10px] font-bold transition shadow-2xs"
                         >
                           + 1/2 kg (500g)
                         </button>
                         <button
                           type="button"
-                          onClick={() => addPackagingVariantPreset('1kg', 1.0, 'Kemasan 1 kg Pack')}
+                          onClick={() => addKgVariantPreset(1.0, 'Kemasan 1 kg Pack')}
                           className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-[10px] font-bold transition shadow-2xs"
                         >
                           + 1 kg Pack
                         </button>
                       </div>
 
-                      {/* Variant list table */}
-                      {editingProduct.packagingVariants && editingProduct.packagingVariants.length > 0 ? (
+                      {/* KG Variant list table */}
+                      {kgFormState.packagingVariants && kgFormState.packagingVariants.length > 0 ? (
                         <div className="space-y-2 mt-2">
-                          {editingProduct.packagingVariants.map((variant, vIdx) => {
+                          {kgFormState.packagingVariants.map((variant, vIdx) => {
                             const variantHpp = costPerKg * (variant.ratioToBase || 0);
                             const profit = variant.sellingPrice - variantHpp;
                             const margin = variant.sellingPrice > 0 ? Math.round((profit / variant.sellingPrice) * 100) : 0;
@@ -2352,9 +2564,9 @@ export const InventoryPage: React.FC = () => {
                                     type="text"
                                     value={variant.name}
                                     onChange={(e) => {
-                                      const updated = [...(editingProduct.packagingVariants || [])];
+                                      const updated = [...(kgFormState.packagingVariants || [])];
                                       updated[vIdx] = { ...updated[vIdx], name: e.target.value };
-                                      setEditingProduct({ ...editingProduct, packagingVariants: updated });
+                                      setKgFormState({ ...kgFormState, packagingVariants: updated });
                                     }}
                                     className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-900"
                                   />
@@ -2365,16 +2577,15 @@ export const InventoryPage: React.FC = () => {
                                   <FormattedNumberInput
                                     value={Math.round((variant.ratioToBase || 0) * 1000)}
                                     onChange={(val) => {
-                                      const updated = [...(editingProduct.packagingVariants || [])];
+                                      const updated = [...(kgFormState.packagingVariants || [])];
                                       const ratio = Math.max(0.001, val / 1000);
                                       updated[vIdx] = { 
                                         ...updated[vIdx], 
                                         ratioToBase: ratio,
                                         costPrice: Math.round(costPerKg * ratio)
                                       };
-                                      setEditingProduct({ ...editingProduct, packagingVariants: updated });
+                                      setKgFormState({ ...kgFormState, packagingVariants: updated });
                                     }}
-                                    suffix="g"
                                     className="bg-slate-50 font-bold"
                                   />
                                   <span className="text-[9px] text-slate-400 block mt-0.5">
@@ -2383,20 +2594,22 @@ export const InventoryPage: React.FC = () => {
                                 </div>
 
                                 <div className="sm:col-span-4">
-                                  <label className="text-[10px] font-bold text-emerald-800 block mb-0.5">Harga Jual (Rp):</label>
+                                  <label className="text-[10px] font-bold text-emerald-800 block mb-0.5">Harga Jual {variant.name ? variant.name : 'Varian'} (Rp):</label>
                                   <FormattedNumberInput
                                     value={variant.sellingPrice}
                                     onChange={(val) => {
-                                      const updated = [...(editingProduct.packagingVariants || [])];
+                                      const updated = [...(kgFormState.packagingVariants || [])];
                                       updated[vIdx] = { ...updated[vIdx], sellingPrice: val };
-                                      setEditingProduct({ ...editingProduct, packagingVariants: updated });
+                                      setKgFormState({ ...kgFormState, packagingVariants: updated });
                                     }}
                                     prefix="Rp"
                                     className="bg-white font-black text-emerald-900"
                                   />
                                   {variant.sellingPrice > 0 && costPerKg > 0 && (
                                     <span className={`text-[9px] font-bold block mt-0.5 ${profit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                                      {profit >= 0 ? `+Rp ${Math.round(profit).toLocaleString('id-ID')} (${margin}%)` : `-Rp ${Math.round(Math.abs(profit)).toLocaleString('id-ID')}`}
+                                      {profit >= 0 
+                                        ? `${variant.name ? variant.name : 'Varian'} Dijual: +Rp ${Math.round(profit).toLocaleString('id-ID')} (${margin}%)` 
+                                        : `${variant.name ? variant.name : 'Varian'} Rugi: -Rp ${Math.round(Math.abs(profit)).toLocaleString('id-ID')}`}
                                     </span>
                                   )}
                                 </div>
@@ -2405,8 +2618,8 @@ export const InventoryPage: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const updated = editingProduct.packagingVariants?.filter((_, i) => i !== vIdx);
-                                      setEditingProduct({ ...editingProduct, packagingVariants: updated });
+                                      const updated = kgFormState.packagingVariants?.filter((_, i) => i !== vIdx);
+                                      setKgFormState({ ...kgFormState, packagingVariants: updated });
                                     }}
                                     className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg border border-red-200 transition"
                                     title="Hapus varian"
@@ -2428,41 +2641,80 @@ export const InventoryPage: React.FC = () => {
                 );
               })()}
 
-              {/* FLOW B: BOX / WHOLESALE FORM (DUS & RENCENG GROSIR) */}
+              {/* FLOW B: BOX / WHOLESALE FORM (DUS & RENCENG/PCS GROSIR) */}
               {productType === 'box' && (() => {
-                const rencengPerDus = Math.max(1, editingProduct.rasioRencengPerDus || 48);
-                const pcsPerRenceng = Math.max(1, editingProduct.rasioPcsPerRenceng || 10);
-                const totalPerDus = rencengPerDus * pcsPerRenceng;
-                const totalBoxes = totalPerDus > 0 ? Math.floor((editingProduct.stock || 0) / totalPerDus) : 0;
-                const totalCost = Number(editingProduct.totalPurchaseCost || 0);
+                const isRencengMode = boxFormState.boxSubUnitType === 'renceng';
+                const rencengPerDus = isRencengMode ? Math.max(0, Number(boxFormState.rasioRencengPerDus) || 0) : 0;
+                const pcsPerRenceng = isRencengMode ? Math.max(0, Number(boxFormState.rasioPcsPerRenceng) || 0) : 0;
+                const pcsPerDusDirect = isRencengMode ? 0 : Math.max(0, Number(boxFormState.rasioPcsPerDus) || 0);
+                const totalPerDus = isRencengMode ? (rencengPerDus * pcsPerRenceng) : pcsPerDusDirect;
+                const totalBoxes = Math.max(0, Number(boxFormState.totalBoxes) || 0);
+                const totalCost = Math.max(0, Number(boxFormState.totalPurchaseCost) || 0);
 
-                // Auto conversion calculations
-                const totalPcs = editingProduct.stock || (totalBoxes * totalPerDus);
-                const costPerPcs = totalPcs > 0 && totalCost > 0
+                // Auto conversion calculations with strict NaN and Infinity guards
+                const totalPcs = totalBoxes * totalPerDus;
+                const costPerPcs = totalPcs > 0 && totalCost > 0 && !isNaN(totalCost / totalPcs)
                   ? Math.round(totalCost / totalPcs)
-                  : (editingProduct.costBase || 0);
-                const boxCost = totalBoxes > 0 && totalCost > 0
+                  : Math.max(0, Number(boxFormState.costBase) || 0);
+                const boxCost = totalBoxes > 0 && totalCost > 0 && !isNaN(totalCost / totalBoxes)
                   ? Math.round(totalCost / totalBoxes)
-                  : (editingProduct.tierConfig?.costTier3 || (costPerPcs * totalPerDus));
-                const costPerRenceng = pcsPerRenceng > 0 ? (costPerPcs * pcsPerRenceng) : Math.round(boxCost / rencengPerDus);
+                  : (costPerPcs * totalPerDus);
+                const costPerRenceng = isRencengMode && pcsPerRenceng > 0 
+                  ? (costPerPcs * pcsPerRenceng) 
+                  : 0;
 
                 // Benchmark margin guidelines
-                const suggestedBoxPrice = Math.round((boxCost * 1.1) / 500) * 500;
-                const suggestedRencengPrice = Math.round((costPerRenceng * 1.15) / 100) * 100;
-                const suggestedPcsPrice = Math.round((costPerPcs * 1.25) / 50) * 50;
+                const suggestedBoxPrice = !isNaN(boxCost) && boxCost > 0 ? Math.round((boxCost * 1.1) / 500) * 500 : 0;
+                const suggestedRencengPrice = isRencengMode && !isNaN(costPerRenceng) && costPerRenceng > 0 ? Math.round((costPerRenceng * 1.15) / 100) * 100 : 0;
+                const suggestedPcsPrice = !isNaN(costPerPcs) && costPerPcs > 0 ? Math.round((costPerPcs * 1.25) / 50) * 50 : 0;
+
+                const getUnitCostAndSuggested = (unitStr: string) => {
+                  const upper = (unitStr || '').toUpperCase().trim();
+                  let cost = costPerPcs;
+                  let suggested = suggestedPcsPrice;
+
+                  if (upper.includes('DUS') || upper.includes('BOX') || upper.includes('KARTON')) {
+                    cost = boxCost > 0 ? boxCost : (totalPerDus > 0 ? costPerPcs * totalPerDus : costPerPcs);
+                    suggested = suggestedBoxPrice;
+                  } else if (upper.includes('RENCENG') || upper.includes('RENTENG')) {
+                    cost = costPerRenceng > 0 ? costPerRenceng : (pcsPerRenceng > 0 ? costPerPcs * pcsPerRenceng : costPerPcs);
+                    suggested = suggestedRencengPrice;
+                  } else if (upper.includes('PACK 6')) {
+                    cost = costPerPcs * 6;
+                    suggested = suggestedPcsPrice * 6;
+                  } else if (upper.includes('PACK 12') || upper.includes('LUSIN')) {
+                    cost = costPerPcs * 12;
+                    suggested = suggestedPcsPrice * 12;
+                  } else if (upper.includes('PACK 24') || upper.includes('KODI')) {
+                    cost = costPerPcs * 24;
+                    suggested = suggestedPcsPrice * 24;
+                  } else {
+                    cost = costPerPcs;
+                    suggested = suggestedPcsPrice;
+                  }
+                  return { unitCost: cost, unitSuggestedPrice: suggested };
+                };
 
                 const addCustomVariantRow = (name: string, ratio: number, price: number) => {
+                  const rawUnit = (name || 'DUS').toUpperCase().trim();
+                  const unitName = rawUnit || 'DUS';
+                  const initialQty = ratio > 0 ? ratio : 1;
+                  const { unitCost, unitSuggestedPrice } = getUnitCostAndSuggested(unitName);
+
+                  const calculatedCost = initialQty * unitCost;
+                  const initialPrice = price > 0 ? price : (initialQty * unitSuggestedPrice);
+
                   const newVariant: RetailPackagingVariant = {
                     id: `var-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                    name: name,
-                    ratioToBase: ratio,
-                    unitLabel: name,
-                    sellingPrice: price,
-                    costPrice: costPerPcs * ratio,
+                    name: unitName,
+                    ratioToBase: initialQty,
+                    unitLabel: unitName,
+                    sellingPrice: initialPrice,
+                    costPrice: calculatedCost,
                   };
-                  setEditingProduct({
-                    ...editingProduct,
-                    packagingVariants: [...(editingProduct.packagingVariants || []), newVariant],
+                  setBoxFormState({
+                    ...boxFormState,
+                    packagingVariants: [...(boxFormState.packagingVariants || []), newVariant],
                   });
                 };
 
@@ -2471,13 +2723,7 @@ export const InventoryPage: React.FC = () => {
                     {/* STEP 1: MULTI-TIER RATIOS & TOTAL PURCHASE COST */}
                     <div className="bg-amber-50/70 border border-amber-200 p-4 rounded-xl space-y-3">
                       <div className="font-bold text-amber-950 flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-xs font-black">
-                          <Boxes className="w-4 h-4 text-amber-700" />
-                          <span>1. Parameter Pembelian Grosir &amp; Rasio Kemasan Bertingkat:</span>
-                        </span>
-                        <span className="text-[10px] font-bold text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded">
-                          Stok Master Tercatat dalam Pcs
-                        </span>
+                        <span className="text-xs font-black">Parameter Pembelian Grosir:</span>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-start">
@@ -2492,108 +2738,34 @@ export const InventoryPage: React.FC = () => {
                               const validBoxes = Math.max(0, boxQty);
                               const newPcs = validBoxes * totalPerDus;
                               const newCostPcs = totalCost > 0 && newPcs > 0 ? Math.round(totalCost / newPcs) : costPerPcs;
-                              const newBoxCost = validBoxes > 0 && totalCost > 0 ? Math.round(totalCost / validBoxes) : (newCostPcs * totalPerDus);
                               
-                              setEditingProduct({
-                                ...editingProduct,
-                                stock: newPcs,
+                              setBoxFormState({
+                                ...boxFormState,
+                                totalBoxes: validBoxes,
                                 costBase: newCostPcs,
-                                tierConfig: {
-                                  ...editingProduct.tierConfig,
-                                  baseUnit: 'pcs',
-                                  costTier3: newBoxCost,
-                                  costTier2: newCostPcs * pcsPerRenceng,
-                                  tier2Name: 'renceng',
-                                  tier2Ratio: pcsPerRenceng,
-                                  tier3Name: 'dus',
-                                  tier3Ratio: totalPerDus,
-                                },
                               });
                             }}
                             suffix="Dus"
-                            placeholder="10"
                             className="bg-white font-black text-amber-950"
                           />
-                          <p className="text-[10px] text-slate-500 mt-1">Jumlah dus yang dibeli.</p>
                         </div>
 
-                        {/* 2. Isi per Dus */}
-                        <div>
+                        {/* 2. Pilihan Tipe Kemasan Dus Dropdown */}
+                        <div className="sm:col-span-2">
                           <label className="text-xs font-bold text-slate-800 block mb-1">
-                            Isi per Dus (Renceng):
+                            Pilih Tipe Kemasan Dus:
                           </label>
-                          <FormattedNumberInput
-                            value={rencengPerDus}
-                            onChange={(rRenceng) => {
-                              const validRenceng = Math.max(1, rRenceng);
-                              const newPerDus = validRenceng * pcsPerRenceng;
-                              const newPcs = totalBoxes * newPerDus;
-                              const newCostPcs = totalCost > 0 && newPcs > 0 ? Math.round(totalCost / newPcs) : costPerPcs;
-                              const newBoxCost = totalBoxes > 0 && totalCost > 0 ? Math.round(totalCost / totalBoxes) : (newCostPcs * newPerDus);
-
-                              setEditingProduct({
-                                ...editingProduct,
-                                rasioRencengPerDus: validRenceng,
-                                stock: newPcs,
-                                costBase: newCostPcs,
-                                tierConfig: {
-                                  ...editingProduct.tierConfig,
-                                  baseUnit: 'pcs',
-                                  costTier3: newBoxCost,
-                                  costTier2: newCostPcs * pcsPerRenceng,
-                                  tier2Name: 'renceng',
-                                  tier2Ratio: pcsPerRenceng,
-                                  tier3Name: 'dus',
-                                  tier3Ratio: newPerDus,
-                                },
-                              });
-                            }}
-                            suffix="Renceng"
-                            placeholder="48"
-                            className="bg-white font-bold"
-                          />
-                          <p className="text-[10px] text-slate-500 mt-1">Contoh: 1 Dus = 48 Renceng.</p>
+                          <select
+                            value={boxFormState.boxSubUnitType}
+                            onChange={(e) => setBoxFormState({ ...boxFormState, boxSubUnitType: e.target.value as 'renceng' | 'pcs' })}
+                            className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900 focus:ring-2 focus:ring-amber-500 text-xs shadow-2xs"
+                          >
+                            <option value="renceng">DUS Renceng - Pcs (Default)</option>
+                            <option value="pcs">DUS Pcs (Langsung ke Pcs)</option>
+                          </select>
                         </div>
 
-                        {/* 3. Isi per Renceng */}
-                        <div>
-                          <label className="text-xs font-bold text-slate-800 block mb-1">
-                            Isi per Renceng (Pcs):
-                          </label>
-                          <FormattedNumberInput
-                            value={pcsPerRenceng}
-                            onChange={(rPcs) => {
-                              const validPcs = Math.max(1, rPcs);
-                              const newPerDus = rencengPerDus * validPcs;
-                              const newPcs = totalBoxes * newPerDus;
-                              const newCostPcs = totalCost > 0 && newPcs > 0 ? Math.round(totalCost / newPcs) : costPerPcs;
-                              const newBoxCost = totalBoxes > 0 && totalCost > 0 ? Math.round(totalCost / totalBoxes) : (newCostPcs * newPerDus);
-
-                              setEditingProduct({
-                                ...editingProduct,
-                                rasioPcsPerRenceng: validPcs,
-                                stock: newPcs,
-                                costBase: newCostPcs,
-                                tierConfig: {
-                                  ...editingProduct.tierConfig,
-                                  baseUnit: 'pcs',
-                                  costTier3: newBoxCost,
-                                  costTier2: newCostPcs * validPcs,
-                                  tier2Name: 'renceng',
-                                  tier2Ratio: validPcs,
-                                  tier3Name: 'dus',
-                                  tier3Ratio: newPerDus,
-                                },
-                              });
-                            }}
-                            suffix="Pcs/Strip"
-                            placeholder="10"
-                            className="bg-white font-bold"
-                          />
-                          <p className="text-[10px] text-slate-500 mt-1">Contoh: 1 Renceng = 10 Pcs.</p>
-                        </div>
-
-                        {/* 4. Total Harga Beli Semua Dus (Rp) */}
+                        {/* 3. Total Harga Beli Semua Dus (Rp) */}
                         <div>
                           <label className="text-xs font-bold text-slate-800 block mb-1">
                             Total Beli Semua Dus:
@@ -2603,62 +2775,95 @@ export const InventoryPage: React.FC = () => {
                             onChange={(val) => {
                               const newTotal = Math.max(0, val);
                               const newCostPcs = totalPcs > 0 ? Math.round(newTotal / totalPcs) : 0;
-                              const newBoxCost = totalBoxes > 0 ? Math.round(newTotal / totalBoxes) : (newCostPcs * totalPerDus);
 
-                              setEditingProduct({
-                                ...editingProduct,
+                              setBoxFormState({
+                                ...boxFormState,
                                 totalPurchaseCost: newTotal,
                                 costBase: newCostPcs,
-                                tierConfig: {
-                                  ...editingProduct.tierConfig,
-                                  baseUnit: 'pcs',
-                                  costTier3: newBoxCost,
-                                  costTier2: newCostPcs * pcsPerRenceng,
-                                  tier2Name: 'renceng',
-                                  tier2Ratio: pcsPerRenceng,
-                                  tier3Name: 'dus',
-                                  tier3Ratio: totalPerDus,
-                                },
                               });
                             }}
                             prefix="Rp"
-                            placeholder="1200000"
                             className="bg-white font-black text-slate-900"
                           />
-                          <p className="text-[10px] text-slate-500 mt-1">Total faktur semua dus dibeli.</p>
                         </div>
                       </div>
 
-                      {/* Live Calculation Ratio Banner */}
-                      <div className="bg-gradient-to-r from-amber-100/90 to-amber-50 border border-amber-300 p-3 rounded-xl text-xs space-y-1">
-                        <div className="font-extrabold text-amber-950 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <span>Konversi Rasio Satuan Otomatis:</span>
-                          </span>
-                          <span className="bg-amber-200/90 text-amber-900 font-mono text-[11px] px-2 py-0.5 rounded font-black">
-                            1 Dus = {rencengPerDus} Renceng = {totalPerDus} Pcs
-                          </span>
+                      {/* Conditional sub-inputs row */}
+                      {isRencengMode ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-amber-200/60">
+                          <div>
+                            <label className="text-xs font-bold text-slate-800 block mb-1">
+                              Isi per Dus (Renceng):
+                            </label>
+                            <FormattedNumberInput
+                              value={rencengPerDus}
+                              onChange={(rRenceng) => {
+                                const validRenceng = Math.max(1, rRenceng);
+                                setBoxFormState({
+                                  ...boxFormState,
+                                  rasioRencengPerDus: validRenceng,
+                                });
+                              }}
+                              suffix="Renceng"
+                              className="bg-white font-bold"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold text-slate-800 block mb-1">
+                              Isi per Renceng (Dus):
+                            </label>
+                            <FormattedNumberInput
+                              value={pcsPerRenceng}
+                              onChange={(rPcs) => {
+                                const validPcs = Math.max(1, rPcs);
+                                setBoxFormState({
+                                  ...boxFormState,
+                                  rasioPcsPerRenceng: validPcs,
+                                });
+                              }}
+                              suffix="Dus/Strip"
+                              className="bg-white font-bold"
+                            />
+                          </div>
                         </div>
-                        <div className="text-amber-900 font-medium">
-                          Total Stok Master: <strong className="text-emerald-800 text-sm font-black">{totalPcs.toLocaleString('id-ID')} Pcs</strong> ({totalBoxes} Dus = {(totalBoxes * rencengPerDus).toLocaleString('id-ID')} Renceng)
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-1 gap-3 pt-2 border-t border-amber-200/60">
+                          <div>
+                            <label className="text-xs font-bold text-slate-800 block mb-1">
+                              Isi per Dus (Dus):
+                            </label>
+                            <FormattedNumberInput
+                              value={boxFormState.rasioPcsPerDus}
+                              onChange={(rPcs) => {
+                                const validPcs = Math.max(1, rPcs);
+                                setBoxFormState({
+                                  ...boxFormState,
+                                  rasioPcsPerDus: validPcs,
+                                });
+                              }}
+                              suffix="Dus"
+                              className="bg-white font-bold"
+                            />
+                          </div>
                         </div>
-                      </div>
+                      )}
+
+                      {/* Live Calculation Ratio Banner Removed */}
                     </div>
 
-                    {/* STEP 2: PRECISE AUTO-CONVERSION HPP BREAKDOWN (PER DUS, PER RENCENG, PER PCS) */}
+                    {/* STEP 2: PRECISE AUTO-CONVERSION HPP BREAKDOWN */}
                     <div className="bg-white p-4 rounded-xl border border-amber-200 shadow-2xs space-y-3">
                       <div className="flex items-center justify-between border-b border-amber-100 pb-2">
                         <div className="flex items-center gap-1.5 font-black text-slate-900 text-xs">
                           <Calculator className="w-4 h-4 text-emerald-600" />
-                          <span>2. Hasil Konversi Presisi Harga Beli Modal (HPP Dus ➔ Renceng ➔ Pcs):</span>
+                          <span>2. Hasil Konversi Presisi Harga Beli Modal (HPP):</span>
                         </div>
                         <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                           Presisi Otomatis
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className={`grid grid-cols-1 ${isRencengMode ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
                         {/* 1. HPP Dus */}
                         <div className="bg-amber-50/80 p-3 rounded-xl border border-amber-200 space-y-1">
                           <span className="text-[10px] font-bold text-amber-800 block uppercase">
@@ -2670,25 +2875,27 @@ export const InventoryPage: React.FC = () => {
                           <span className="text-[9px] text-amber-700 block">
                             {totalCost > 0 && totalBoxes > 0 
                               ? `Rumus: Rp ${totalCost.toLocaleString('id-ID')} ÷ ${totalBoxes} Dus` 
-                              : `Rumus: HPP Pcs &times; ${totalPerDus} Pcs`}
+                              : `Rumus: HPP Pcs × ${totalPerDus} Pcs`}
                           </span>
                         </div>
 
-                        {/* 2. HPP Renceng */}
-                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
-                          <span className="text-[10px] font-bold text-slate-600 block uppercase">
-                            HPP per 1 Renceng (Strip)
-                          </span>
-                          <div className="text-base font-black text-slate-900">
-                            Rp {costPerRenceng.toLocaleString('id-ID')}
+                        {/* 2. HPP Renceng (if renceng mode) */}
+                        {isRencengMode && (
+                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+                            <span className="text-[10px] font-bold text-slate-600 block uppercase">
+                              HPP per 1 Renceng (Strip)
+                            </span>
+                            <div className="text-base font-black text-slate-900">
+                              Rp {costPerRenceng.toLocaleString('id-ID')}
+                            </div>
+                            <span className="text-[9px] text-slate-500 block">
+                              Rumus: HPP Dus ÷ {rencengPerDus} Renceng
+                            </span>
                           </div>
-                          <span className="text-[9px] text-slate-500 block">
-                            Rumus: HPP Dus (Rp {boxCost.toLocaleString('id-ID')}) ÷ {rencengPerDus} Renceng
-                          </span>
-                        </div>
+                        )}
 
                         {/* 3. HPP Pcs */}
-                        <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200 space-y-1">
+                        <div className="bg-emerald-50/80 p-3 rounded-xl border border-amber-200 space-y-1">
                           <span className="text-[10px] font-bold text-emerald-800 block uppercase">
                             HPP per 1 Pcs (Eceran Satuan)
                           </span>
@@ -2713,9 +2920,11 @@ export const InventoryPage: React.FC = () => {
                           <span className="bg-white px-2 py-0.5 rounded border border-amber-200">
                             Dus (+10%): <strong>Rp {suggestedBoxPrice.toLocaleString('id-ID')}</strong>
                           </span>
-                          <span className="bg-white px-2 py-0.5 rounded border border-amber-200">
-                            Renceng (+15%): <strong>Rp {suggestedRencengPrice.toLocaleString('id-ID')}</strong>
-                          </span>
+                          {isRencengMode && (
+                            <span className="bg-white px-2 py-0.5 rounded border border-amber-200">
+                              Renceng (+15%): <strong>Rp {suggestedRencengPrice.toLocaleString('id-ID')}</strong>
+                            </span>
+                          )}
                           <span className="bg-white px-2 py-0.5 rounded border border-amber-200">
                             Pcs (+25%): <strong>Rp {suggestedPcsPrice.toLocaleString('id-ID')}</strong>
                           </span>
@@ -2732,13 +2941,13 @@ export const InventoryPage: React.FC = () => {
                             <span>3. Varian Harga Jual Custom (Kemasan / Eceran)</span>
                           </div>
                           <p className="text-[10px] text-slate-500 mt-0.5">
-                            Tentukan satuan penjualan bebas (Dus, Pack, Renceng, Pcs, dll) dengan harga jual manual sesuai kebijakan toko.
+                            Tentukan satuan penjualan bebas (Dus, {isRencengMode ? 'Renceng, ' : ''}Pcs, Pack, dll) dengan harga jual manual.
                           </p>
                         </div>
 
                         <button
                           type="button"
-                          onClick={() => addCustomVariantRow('', 1, 0)}
+                          onClick={() => addCustomVariantRow('DUS', 1, suggestedBoxPrice || 0)}
                           className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-2xs active:scale-95"
                         >
                           <Plus className="w-3.5 h-3.5" />
@@ -2751,105 +2960,166 @@ export const InventoryPage: React.FC = () => {
                         <span className="text-[10px] font-bold text-slate-500">Preset Cepat:</span>
                         <button
                           type="button"
-                          onClick={() => addCustomVariantRow('Dus', totalPerDus, suggestedBoxPrice || 120000)}
-                          className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 rounded-lg text-[10px] font-bold transition shadow-2xs"
-                          title={`Tambah varian Dus (isi ${totalPerDus} Pcs)`}
+                          onClick={() => addCustomVariantRow('DUS', 1, suggestedBoxPrice || 0)}
+                          className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 rounded-lg text-[10px] font-bold transition shadow-2xs uppercase"
+                          title="Tambah varian DUS (1 Dus)"
                         >
-                          + Preset Dus ({totalPerDus} Pcs)
+                          + Preset DUS (1 Dus)
                         </button>
+                        {isRencengMode && (
+                          <button
+                            type="button"
+                            onClick={() => addCustomVariantRow('RENCENG', 1, suggestedRencengPrice || 0)}
+                            className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 rounded-lg text-[10px] font-bold transition shadow-2xs uppercase"
+                            title="Tambah varian RENCENG (1 Renceng)"
+                          >
+                            + Preset RENCENG (1 Renceng)
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => addCustomVariantRow('Renceng', pcsPerRenceng, suggestedRencengPrice || 2800)}
-                          className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 rounded-lg text-[10px] font-bold transition shadow-2xs"
-                          title={`Tambah varian Renceng (isi ${pcsPerRenceng} Pcs)`}
+                          onClick={() => addCustomVariantRow('PCS', 1, suggestedPcsPrice || 0)}
+                          className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 rounded-lg text-[10px] font-bold transition shadow-2xs uppercase"
+                          title="Tambah varian Eceran PCS (isi 1 Pcs)"
                         >
-                          + Preset Renceng ({pcsPerRenceng} Pcs)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => addCustomVariantRow('Pcs', 1, suggestedPcsPrice || 300)}
-                          className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 rounded-lg text-[10px] font-bold transition shadow-2xs"
-                          title="Tambah varian Eceran Pcs (isi 1 Pcs)"
-                        >
-                          + Preset Pcs (1 Pcs)
+                          + Preset PCS (1 Pcs)
                         </button>
                       </div>
 
                       {/* Dynamic Custom Variant Rows List */}
-                      {editingProduct.packagingVariants && editingProduct.packagingVariants.length > 0 ? (
+                      {boxFormState.packagingVariants && boxFormState.packagingVariants.length > 0 ? (
                         <div className="space-y-2 mt-2">
-                          {editingProduct.packagingVariants.map((variant, vIdx) => {
-                            const variantHpp = costPerPcs * (variant.ratioToBase || 1);
-                            const profit = variant.sellingPrice - variantHpp;
-                            const marginPct = variant.sellingPrice > 0 ? Math.round((profit / variant.sellingPrice) * 100) : 0;
-                            const suggestedVariantPrice = Math.round((variantHpp * 1.15) / 50) * 50;
+                          {boxFormState.packagingVariants.map((variant, vIdx) => {
+                            const currentUnit = (variant.name || '').trim() || 'DUS';
+
+                            // Quantity / Isi input by user from "Isi dus yang akan dijual"
+                            const quantityNum = Number(variant.ratioToBase);
+                            const quantity = !isNaN(quantityNum) && quantityNum > 0 ? quantityNum : 1;
+
+                            // Unit cost per 1 unit of packaging
+                            const { unitCost, unitSuggestedPrice } = getUnitCostAndSuggested(currentUnit);
+
+                            // Total HPP for variant: quantity * unitCost (Harga per unit dikalikan isi unit yang akan dijual)
+                            const variantHpp = quantity * unitCost;
+
+                            const profit = (variant.sellingPrice || 0) - variantHpp;
+                            const marginPct = (variant.sellingPrice || 0) > 0 ? Math.round((profit / (variant.sellingPrice || 1)) * 100) : 0;
+                            const isDusUnit = currentUnit.toUpperCase().includes('DUS') || currentUnit.toUpperCase().includes('BOX') || currentUnit.toUpperCase().includes('KARTON');
+                            const suggestedVariantPrice = isDusUnit && suggestedBoxPrice > 0
+                              ? Math.round((quantity * suggestedBoxPrice) / 500) * 500
+                              : Math.round((variantHpp * 1.15) / 50) * 50;
 
                             return (
                               <div
                                 key={variant.id || vIdx}
                                 className="bg-white p-3 rounded-xl border border-amber-200/90 shadow-2xs grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center hover:border-amber-400 transition"
                               >
-                                {/* 1. Nama Varian */}
                                 <div className="sm:col-span-4">
                                   <label className="text-[10px] font-bold text-slate-700 block mb-0.5">
                                     Nama Satuan / Varian:
                                   </label>
                                   <input
                                     type="text"
-                                    value={variant.name}
-                                    placeholder="Contoh: Dus, Renceng, Pcs, Pack 6"
+                                    value={variant.name || ''}
                                     onChange={(e) => {
-                                      const updated = [...(editingProduct.packagingVariants || [])];
-                                      updated[vIdx] = { ...updated[vIdx], name: e.target.value, unitLabel: e.target.value };
-                                      setEditingProduct({ ...editingProduct, packagingVariants: updated });
+                                      const val = e.target.value.toUpperCase();
+                                      const updated = [...(boxFormState.packagingVariants || [])];
+                                      const qty = Math.max(1, Number(updated[vIdx].ratioToBase) || 1);
+                                      const { unitCost: newUnitCost, unitSuggestedPrice: defaultSuggested } = getUnitCostAndSuggested(val);
+
+                                      const calculatedCost = qty * newUnitCost;
+                                      const currentPrice = updated[vIdx].sellingPrice || 0;
+                                      const autoPrice = (currentPrice === 0 && defaultSuggested > 0) ? (qty * defaultSuggested) : currentPrice;
+
+                                      updated[vIdx] = { 
+                                        ...updated[vIdx], 
+                                        name: val, 
+                                        unitLabel: val,
+                                        ratioToBase: qty,
+                                        costPrice: calculatedCost,
+                                        sellingPrice: autoPrice,
+                                      };
+                                      setBoxFormState({ ...boxFormState, packagingVariants: updated });
                                     }}
-                                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:bg-white focus:ring-1 focus:ring-amber-500"
+                                    placeholder="Ketik nama satuan (misal: DUS 2, KARTON, SLOP...)"
+                                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-black text-slate-900 focus:bg-white focus:ring-1 focus:ring-amber-500 uppercase tracking-wide placeholder:normal-case placeholder:font-normal placeholder:text-slate-400"
                                   />
                                 </div>
 
-                                {/* 2. Rasio ke Pcs */}
                                 <div className="sm:col-span-3">
-                                  <label className="text-[10px] font-bold text-slate-700 block mb-0.5">
-                                    Isi / Rasio ke Pcs:
+                                  <label className="text-[10px] font-bold text-slate-700 block mb-0.5 truncate" title={`Isi ${currentUnit} yang akan dijual`}>
+                                    Isi {currentUnit} yang akan dijual
                                   </label>
                                   <FormattedNumberInput
                                     value={variant.ratioToBase}
                                     onChange={(val) => {
-                                      const updated = [...(editingProduct.packagingVariants || [])];
-                                      const safeRatio = Math.max(1, val);
+                                      const updated = [...(boxFormState.packagingVariants || [])];
+                                      const safeQty = Math.max(1, val);
+                                      const u = (updated[vIdx].name || currentUnit).toUpperCase().trim();
+                                      
+                                      const { unitCost: currentUnitCost, unitSuggestedPrice: currentSuggestedUnit } = getUnitCostAndSuggested(u);
+
+                                      // Total HPP for variant: harga perdus dikalikan isi dus yang akan dijual
+                                      const newTotalCost = safeQty * currentUnitCost;
+
+                                      // Auto-scale selling price proportionally if it hasn't been specifically customized
+                                      const prevQty = Math.max(1, Number(updated[vIdx].ratioToBase) || 1);
+                                      const prevPrice = Number(updated[vIdx].sellingPrice) || 0;
+                                      let newSellingPrice = prevPrice;
+
+                                      if (prevPrice <= 0 && currentSuggestedUnit > 0) {
+                                        newSellingPrice = safeQty * currentSuggestedUnit;
+                                      } else if (prevPrice > 0 && safeQty !== prevQty) {
+                                        newSellingPrice = Math.round((prevPrice / prevQty) * safeQty);
+                                      }
+
                                       updated[vIdx] = { 
                                         ...updated[vIdx], 
-                                        ratioToBase: safeRatio,
-                                        costPrice: costPerPcs * safeRatio
+                                        ratioToBase: safeQty,
+                                        costPrice: newTotalCost,
+                                        sellingPrice: newSellingPrice,
                                       };
-                                      setEditingProduct({ ...editingProduct, packagingVariants: updated });
+                                      setBoxFormState({ ...boxFormState, packagingVariants: updated });
                                     }}
-                                    suffix="Pcs"
-                                    className="bg-slate-50 font-bold"
+                                    suffix={currentUnit}
+                                    className="bg-slate-50 font-bold uppercase"
                                   />
-                                  {costPerPcs > 0 && (
-                                    <span className="text-[9px] text-slate-400 mt-0.5 block truncate">
-                                      HPP: Rp {Math.round(variantHpp).toLocaleString('id-ID')}
-                                    </span>
+                                  {(variantHpp > 0 || boxCost > 0 || costPerPcs > 0) && (
+                                    <div className="mt-1">
+                                      {isDusUnit ? (
+                                        <div className="text-[10px] font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                          <span>HPP {currentUnit}: <strong>Rp {Math.round(variantHpp).toLocaleString('id-ID')}</strong></span>
+                                          <span className="text-[9px] text-amber-700 block font-normal">
+                                            (Rp {Math.round(unitCost).toLocaleString('id-ID')} × {quantity} {currentUnit})
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <div className="text-[10px] font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                                          <span>HPP {currentUnit}: <strong>Rp {Math.round(variantHpp).toLocaleString('id-ID')}</strong></span>
+                                          <span className="text-[9px] text-slate-500 block font-normal">
+                                            (Rp {Math.round(unitCost).toLocaleString('id-ID')} × {quantity} {currentUnit})
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
 
-                                {/* 3. Harga Jual */}
                                 <div className="sm:col-span-4">
                                   <div className="flex items-center justify-between mb-0.5">
                                     <label className="text-[10px] font-bold text-emerald-800">
-                                      Harga Jual (Rp):
+                                      Harga Jual {variant.name ? variant.name : 'Varian'} (Rp):
                                     </label>
-                                    {costPerPcs > 0 && (
+                                    {(costPerPcs > 0 || boxCost > 0 || variantHpp > 0) && (
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          const updated = [...(editingProduct.packagingVariants || [])];
+                                          const updated = [...(boxFormState.packagingVariants || [])];
                                           updated[vIdx] = { ...updated[vIdx], sellingPrice: suggestedVariantPrice };
-                                          setEditingProduct({ ...editingProduct, packagingVariants: updated });
+                                          setBoxFormState({ ...boxFormState, packagingVariants: updated });
                                         }}
                                         className="text-[9px] text-amber-700 hover:text-amber-900 underline font-semibold"
-                                        title="Gunakan harga rekomendasi margin 15%"
+                                        title="Gunakan harga rekomendasi margin"
                                       >
                                         Saran: Rp {suggestedVariantPrice.toLocaleString('id-ID')}
                                       </button>
@@ -2858,28 +3128,29 @@ export const InventoryPage: React.FC = () => {
                                   <FormattedNumberInput
                                     value={variant.sellingPrice}
                                     onChange={(val) => {
-                                      const updated = [...(editingProduct.packagingVariants || [])];
+                                      const updated = [...(boxFormState.packagingVariants || [])];
                                       updated[vIdx] = { ...updated[vIdx], sellingPrice: val };
-                                      setEditingProduct({ ...editingProduct, packagingVariants: updated });
+                                      setBoxFormState({ ...boxFormState, packagingVariants: updated });
                                     }}
                                     prefix="Rp"
-                                    placeholder="0"
+                                    placeholder=""
                                     className="bg-white font-black text-emerald-900"
                                   />
-                                  {variant.sellingPrice > 0 && costPerPcs > 0 && (
+                                  {(variant.sellingPrice || 0) > 0 && (costPerPcs > 0 || boxCost > 0 || variantHpp > 0) && (
                                     <span className={`text-[9px] font-bold mt-0.5 block truncate ${profit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                                      {profit >= 0 ? `+Rp ${Math.round(profit).toLocaleString('id-ID')} (${marginPct}%)` : `-Rp ${Math.round(Math.abs(profit)).toLocaleString('id-ID')}`}
+                                      {profit >= 0 
+                                        ? `${variant.name ? variant.name : 'Varian'} Dijual: +Rp ${Math.round(profit).toLocaleString('id-ID')} (${marginPct}%)` 
+                                        : `${variant.name ? variant.name : 'Varian'} Rugi: -Rp ${Math.round(Math.abs(profit)).toLocaleString('id-ID')}`}
                                     </span>
                                   )}
                                 </div>
 
-                                {/* 4. Delete Action */}
                                 <div className="sm:col-span-1 flex justify-end sm:justify-center pt-2 sm:pt-4">
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const updated = editingProduct.packagingVariants?.filter((_, i) => i !== vIdx);
-                                      setEditingProduct({ ...editingProduct, packagingVariants: updated });
+                                      const updated = boxFormState.packagingVariants?.filter((_, i) => i !== vIdx);
+                                      setBoxFormState({ ...boxFormState, packagingVariants: updated });
                                     }}
                                     className="p-1.5 text-red-600 hover:bg-red-50 hover:border-red-300 rounded-lg border border-red-200 transition"
                                     title="Hapus varian ini"
@@ -2892,12 +3163,8 @@ export const InventoryPage: React.FC = () => {
                           })}
                         </div>
                       ) : (
-                        <div className="bg-white p-6 rounded-xl border border-dashed border-amber-300 text-center space-y-2">
-                          <Boxes className="w-8 h-8 text-amber-400 mx-auto" />
-                          <p className="text-xs font-bold text-slate-700">Belum Ada Varian Harga Jual Custom</p>
-                          <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-                            Klik tombol <strong>+ Tambah Varian Custom</strong> atau pilih salah satu <strong>Preset Cepat (Dus, Renceng, Pcs)</strong> di atas untuk mengatur satuan dan harga jual produk ini.
-                          </p>
+                        <div className="bg-white p-4 rounded-xl border border-dashed border-amber-300 text-center text-slate-500 text-[11px]">
+                          Belum ada varian kemasan eceran. Klik salah satu tombol preset di atas atau tambah custom.
                         </div>
                       )}
                     </div>
@@ -2905,21 +3172,20 @@ export const InventoryPage: React.FC = () => {
                 );
               })()}
 
-
               {/* FLOW C: PCS / RETAIL FORM (PCS & BUNGKUS) */}
               {productType === 'pcs' && (() => {
-                const stockPcs = Number(editingProduct.stock || 0);
-                const totalCost = Number(editingProduct.totalPurchaseCost || 0);
-                const costPerPcs = Number(editingProduct.costBase || 0);
-                const sellingPrice = Number(editingProduct.priceBase || 0);
+                const stockPcs = Number(pcsFormState.stock || 0);
+                const totalCost = Number(pcsFormState.totalPurchaseCost || 0);
+                const costPerPcs = Number(pcsFormState.costBase || 0);
+                const sellingPrice = Number(pcsFormState.priceBase || 0);
                 const profitPerPcs = sellingPrice - costPerPcs;
                 const marginPct = sellingPrice > 0 ? Math.round((profitPerPcs / sellingPrice) * 100) : 0;
-                const baseUnitLabel = (editingProduct.baseUnit || 'pcs').toUpperCase();
+                const baseUnitLabel = (pcsFormState.baseUnit || 'pcs').toUpperCase();
 
                 const applyMarginPcs = (pct: number) => {
                   const targetPrice = Math.round((costPerPcs * (1 + pct / 100)) / 100) * 100;
-                  setEditingProduct({
-                    ...editingProduct,
+                  setPcsFormState({
+                    ...pcsFormState,
                     priceBase: targetPrice,
                   });
                 };
@@ -2945,8 +3211,8 @@ export const InventoryPage: React.FC = () => {
                             Pilih Satuan:
                           </label>
                           <select
-                            value={editingProduct.baseUnit || 'pcs'}
-                            onChange={(e) => setEditingProduct({ ...editingProduct, baseUnit: e.target.value as UnitType })}
+                            value={pcsFormState.baseUnit || 'pcs'}
+                            onChange={(e) => setPcsFormState({ ...pcsFormState, baseUnit: e.target.value as UnitType })}
                             className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-bold uppercase text-slate-900 focus:ring-2 focus:ring-blue-500 text-xs"
                           >
                             <option value="pcs">Pcs</option>
@@ -2969,14 +3235,14 @@ export const InventoryPage: React.FC = () => {
                             onChange={(val) => {
                               const newStock = Math.max(0, val);
                               const newCost = totalCost > 0 && newStock > 0 ? Math.round(totalCost / newStock) : costPerPcs;
-                              setEditingProduct({
-                                ...editingProduct,
+                              setPcsFormState({
+                                ...pcsFormState,
                                 stock: newStock,
                                 costBase: newCost,
                               });
                             }}
-                            suffix={editingProduct.baseUnit || 'Pcs'}
-                            placeholder="100"
+                            suffix={pcsFormState.baseUnit || 'Pcs'}
+                            placeholder=""
                             className="bg-white font-black text-slate-900"
                           />
                           <span className="text-[10px] text-slate-500 mt-1 block">Jumlah unit masuk.</span>
@@ -2992,14 +3258,14 @@ export const InventoryPage: React.FC = () => {
                             onChange={(val) => {
                               const newTotal = Math.max(0, val);
                               const newCost = stockPcs > 0 ? Math.round(newTotal / stockPcs) : costPerPcs;
-                              setEditingProduct({
-                                ...editingProduct,
+                              setPcsFormState({
+                                ...pcsFormState,
                                 totalPurchaseCost: newTotal,
                                 costBase: newCost,
                               });
                             }}
                             prefix="Rp"
-                            placeholder="250000"
+                            placeholder=""
                             className="bg-white font-black text-slate-900"
                           />
                           <span className="text-[10px] text-slate-500 mt-1 block">Total faktur belanja.</span>
@@ -3015,14 +3281,14 @@ export const InventoryPage: React.FC = () => {
                             onChange={(val) => {
                               const newCost = Math.max(0, val);
                               const newTotal = stockPcs > 0 ? Math.round(stockPcs * newCost) : totalCost;
-                              setEditingProduct({
-                                ...editingProduct,
+                              setPcsFormState({
+                                ...pcsFormState,
                                 costBase: newCost,
                                 totalPurchaseCost: newTotal,
                               });
                             }}
                             prefix="Rp"
-                            placeholder="2500"
+                            placeholder=""
                             className="bg-blue-50 border-blue-300 font-black text-blue-950"
                           />
                           <span className="text-[10px] text-blue-700 mt-1 block font-medium">
@@ -3049,35 +3315,28 @@ export const InventoryPage: React.FC = () => {
                               onClick={() => applyMarginPcs(10)}
                               className="px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-bold border border-slate-200 transition"
                             >
-                              +10% (Rp {Math.round((costPerPcs * 1.10) / 100) * 100})
+                              +10%
                             </button>
                             <button
                               type="button"
                               onClick={() => applyMarginPcs(15)}
                               className="px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-bold border border-slate-200 transition"
                             >
-                              +15% (Rp {Math.round((costPerPcs * 1.15) / 100) * 100})
+                              +15%
                             </button>
                             <button
                               type="button"
                               onClick={() => applyMarginPcs(20)}
                               className="px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-bold border border-slate-200 transition"
                             >
-                              +20% (Rp {Math.round((costPerPcs * 1.20) / 100) * 100})
+                              +20%
                             </button>
                             <button
                               type="button"
                               onClick={() => applyMarginPcs(25)}
                               className="px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-bold border border-slate-200 transition"
                             >
-                              +25% (Rp {Math.round((costPerPcs * 1.25) / 100) * 100})
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => applyMarginPcs(30)}
-                              className="px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-bold border border-slate-200 transition"
-                            >
-                              +30% (Rp {Math.round((costPerPcs * 1.30) / 100) * 100})
+                              +25%
                             </button>
                           </div>
                         )}
@@ -3090,9 +3349,9 @@ export const InventoryPage: React.FC = () => {
                           </label>
                           <FormattedNumberInput
                             value={sellingPrice}
-                            onChange={(val) => setEditingProduct({ ...editingProduct, priceBase: val })}
+                            onChange={(val) => setPcsFormState({ ...pcsFormState, priceBase: val })}
                             prefix="Rp"
-                            placeholder="3000"
+                            placeholder=""
                             className="bg-white font-black text-emerald-900"
                           />
                         </div>
@@ -3136,22 +3395,41 @@ export const InventoryPage: React.FC = () => {
 
               {/* FLOW D: LITER / LIQUID FORM (BARANG CAIR) */}
               {productType === 'liter' && (() => {
-                const stockLiter = Number(editingProduct.stock || 0);
-                const totalCost = Number(editingProduct.totalPurchaseCost || 0);
-                const costPerLiter = Number(editingProduct.costBase || 0);
+                const stockLiter = Number(literFormState.stock || 0);
+                const totalCost = Number(literFormState.totalPurchaseCost || 0);
+                const costPerLiter = Number(literFormState.costBase || 0);
                 const cost500ml = Math.round(costPerLiter * 0.5);
                 const cost250ml = Math.round(costPerLiter * 0.25);
                 const cost100ml = Math.round(costPerLiter * 0.1);
                 const cost1ml = costPerLiter > 0 ? (costPerLiter / 1000) : 0;
-                const sellingPrice = Number(editingProduct.priceBase || 0);
+                const sellingPrice = Number(literFormState.priceBase || 0);
                 const profitPerLiter = sellingPrice - costPerLiter;
                 const marginPct = sellingPrice > 0 ? Math.round((profitPerLiter / sellingPrice) * 100) : 0;
 
                 const applyMarginLiter = (pct: number) => {
                   const targetPrice = Math.round((costPerLiter * (1 + pct / 100)) / 100) * 100;
-                  setEditingProduct({
-                    ...editingProduct,
+                  setLiterFormState({
+                    ...literFormState,
                     priceBase: targetPrice,
+                  });
+                };
+
+                const addLiterVariantPreset = (ratio: number, defaultName: string) => {
+                  const existing = literFormState.packagingVariants || [];
+                  let suggestedPrice = Math.round((sellingPrice * ratio) / 100) * 100;
+                  if (suggestedPrice < 500) suggestedPrice = 1000;
+
+                  const newVariant: RetailPackagingVariant = {
+                    id: `var-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                    name: defaultName,
+                    ratioToBase: ratio,
+                    unitLabel: 'Botol',
+                    sellingPrice: suggestedPrice,
+                    costPrice: Math.round(costPerLiter * ratio),
+                  };
+                  setLiterFormState({
+                    ...literFormState,
+                    packagingVariants: [...existing, newVariant],
                   });
                 };
 
@@ -3176,8 +3454,8 @@ export const InventoryPage: React.FC = () => {
                             Satuan Utama:
                           </label>
                           <select
-                            value={editingProduct.baseUnit || 'liter'}
-                            onChange={(e) => setEditingProduct({ ...editingProduct, baseUnit: e.target.value as UnitType })}
+                            value={literFormState.baseUnit || 'liter'}
+                            onChange={(e) => setLiterFormState({ ...literFormState, baseUnit: e.target.value as UnitType })}
                             className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-bold uppercase text-slate-900 focus:ring-2 focus:ring-cyan-500 text-xs"
                           >
                             <option value="liter">Liter</option>
@@ -3198,15 +3476,15 @@ export const InventoryPage: React.FC = () => {
                             onChange={(val) => {
                               const newStock = Math.max(0, val);
                               const newCost = totalCost > 0 && newStock > 0 ? Math.round(totalCost / newStock) : costPerLiter;
-                              setEditingProduct({
-                                ...editingProduct,
+                              setLiterFormState({
+                                ...literFormState,
                                 stock: newStock,
                                 costBase: newCost,
                               });
                             }}
                             allowDecimal={true}
                             suffix="Liter"
-                            placeholder="20"
+                            placeholder=""
                             className="bg-white font-black text-slate-900"
                           />
                           <span className="text-[10px] text-slate-500 mt-1 block">Contoh: 20 Liter atau 20.5 L.</span>
@@ -3222,14 +3500,14 @@ export const InventoryPage: React.FC = () => {
                             onChange={(val) => {
                               const newTotal = Math.max(0, val);
                               const newCost = stockLiter > 0 ? Math.round(newTotal / stockLiter) : costPerLiter;
-                              setEditingProduct({
-                                ...editingProduct,
+                              setLiterFormState({
+                                ...literFormState,
                                 totalPurchaseCost: newTotal,
                                 costBase: newCost,
                               });
                             }}
                             prefix="Rp"
-                            placeholder="280000"
+                            placeholder=""
                             className="bg-white font-black text-slate-900"
                           />
                           <span className="text-[10px] text-slate-500 mt-1 block">Total nilai faktur kulakan.</span>
@@ -3245,14 +3523,14 @@ export const InventoryPage: React.FC = () => {
                             onChange={(val) => {
                               const newCost = Math.max(0, val);
                               const newTotal = stockLiter > 0 ? Math.round(stockLiter * newCost) : totalCost;
-                              setEditingProduct({
-                                ...editingProduct,
+                              setLiterFormState({
+                                ...literFormState,
                                 costBase: newCost,
                                 totalPurchaseCost: newTotal,
                               });
                             }}
                             prefix="Rp"
-                            placeholder="14000"
+                            placeholder=""
                             className="bg-cyan-50 border-cyan-300 font-black text-cyan-950"
                           />
                           <span className="text-[10px] text-cyan-700 mt-1 block font-medium">
@@ -3264,7 +3542,7 @@ export const InventoryPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* LIVE AUTOMATIC CONVERSION DOWNWARD BREAKDOWN (MILILITER / ML) */}
+                    {/* LIVE AUTOMATIC CONVERSION DOWNWARD BREAKDOWN */}
                     <div className="bg-white p-4 rounded-xl border border-cyan-200 shadow-2xs space-y-3">
                       <div className="flex items-center justify-between border-b border-cyan-100 pb-2">
                         <div className="flex items-center gap-1.5 font-black text-slate-900 text-xs">
@@ -3362,13 +3640,6 @@ export const InventoryPage: React.FC = () => {
                             >
                               +25%
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => applyMarginLiter(30)}
-                              className="px-2 py-0.5 rounded bg-slate-100 hover:bg-cyan-50 text-slate-700 hover:text-cyan-800 font-bold border border-slate-200 transition"
-                            >
-                              +30%
-                            </button>
                           </div>
                         )}
                       </div>
@@ -3380,9 +3651,9 @@ export const InventoryPage: React.FC = () => {
                           </label>
                           <FormattedNumberInput
                             value={sellingPrice}
-                            onChange={(val) => setEditingProduct({ ...editingProduct, priceBase: val })}
+                            onChange={(val) => setLiterFormState({ ...literFormState, priceBase: val })}
                             prefix="Rp"
-                            placeholder="16000"
+                            placeholder=""
                             className="bg-white font-black text-emerald-900"
                           />
                         </div>
@@ -3431,9 +3702,9 @@ export const InventoryPage: React.FC = () => {
                               sellingPrice: Math.round((costPerLiter * 0.5 * 1.15) / 100) * 100 || 8000,
                               costPrice: Math.round(costPerLiter * 0.5),
                             };
-                            setEditingProduct({
-                              ...editingProduct,
-                              packagingVariants: [...(editingProduct.packagingVariants || []), newVariant],
+                            setLiterFormState({
+                              ...literFormState,
+                              packagingVariants: [...(literFormState.packagingVariants || []), newVariant],
                             });
                           }}
                           className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition shadow-2xs"
@@ -3448,21 +3719,21 @@ export const InventoryPage: React.FC = () => {
                         <span className="text-[10px] font-bold text-slate-500">Preset Cepat:</span>
                         <button
                           type="button"
-                          onClick={() => addPackagingVariantPreset('250ml', 0.25, 'Kemasan Cup 250ml')}
+                          onClick={() => addLiterVariantPreset(0.25, 'Kemasan Cup 250ml')}
                           className="px-2.5 py-1 bg-white hover:bg-cyan-100 text-cyan-900 border border-cyan-300 rounded-lg text-[10px] font-bold transition shadow-2xs"
                         >
                           + Cup 250ml (0.25 L)
                         </button>
                         <button
                           type="button"
-                          onClick={() => addPackagingVariantPreset('500ml', 0.5, 'Kemasan Botol 500ml')}
+                          onClick={() => addLiterVariantPreset(0.5, 'Kemasan Botol 500ml')}
                           className="px-2.5 py-1 bg-white hover:bg-cyan-100 text-cyan-900 border border-cyan-300 rounded-lg text-[10px] font-bold transition shadow-2xs"
                         >
                           + Botol 500ml (0.5 L)
                         </button>
                         <button
                           type="button"
-                          onClick={() => addPackagingVariantPreset('1L', 1.0, 'Kemasan Botol 1 Liter')}
+                          onClick={() => addLiterVariantPreset(1.0, 'Kemasan Botol 1 Liter')}
                           className="px-2.5 py-1 bg-white hover:bg-cyan-100 text-cyan-900 border border-cyan-300 rounded-lg text-[10px] font-bold transition shadow-2xs"
                         >
                           + Botol 1 Liter
@@ -3470,9 +3741,9 @@ export const InventoryPage: React.FC = () => {
                       </div>
 
                       {/* Variant list table */}
-                      {editingProduct.packagingVariants && editingProduct.packagingVariants.length > 0 ? (
+                      {literFormState.packagingVariants && literFormState.packagingVariants.length > 0 ? (
                         <div className="space-y-2 mt-2">
-                          {editingProduct.packagingVariants.map((variant, vIdx) => {
+                          {literFormState.packagingVariants.map((variant, vIdx) => {
                             const variantHpp = costPerLiter * (variant.ratioToBase || 0);
                             const profit = variant.sellingPrice - variantHpp;
                             const margin = variant.sellingPrice > 0 ? Math.round((profit / variant.sellingPrice) * 100) : 0;
@@ -3489,9 +3760,9 @@ export const InventoryPage: React.FC = () => {
                                     type="text"
                                     value={variant.name}
                                     onChange={(e) => {
-                                      const updated = [...(editingProduct.packagingVariants || [])];
+                                      const updated = [...(literFormState.packagingVariants || [])];
                                       updated[vIdx] = { ...updated[vIdx], name: e.target.value };
-                                      setEditingProduct({ ...editingProduct, packagingVariants: updated });
+                                      setLiterFormState({ ...literFormState, packagingVariants: updated });
                                     }}
                                     className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-900"
                                   />
@@ -3502,14 +3773,14 @@ export const InventoryPage: React.FC = () => {
                                   <FormattedNumberInput
                                     value={variant.ratioToBase}
                                     onChange={(val) => {
-                                      const updated = [...(editingProduct.packagingVariants || [])];
+                                      const updated = [...(literFormState.packagingVariants || [])];
                                       const ratio = Math.max(0.01, val);
                                       updated[vIdx] = { 
                                         ...updated[vIdx], 
                                         ratioToBase: ratio,
                                         costPrice: Math.round(costPerLiter * ratio)
                                       };
-                                      setEditingProduct({ ...editingProduct, packagingVariants: updated });
+                                      setLiterFormState({ ...literFormState, packagingVariants: updated });
                                     }}
                                     allowDecimal={true}
                                     suffix="L"
@@ -3525,9 +3796,9 @@ export const InventoryPage: React.FC = () => {
                                   <FormattedNumberInput
                                     value={variant.sellingPrice}
                                     onChange={(val) => {
-                                      const updated = [...(editingProduct.packagingVariants || [])];
+                                      const updated = [...(literFormState.packagingVariants || [])];
                                       updated[vIdx] = { ...updated[vIdx], sellingPrice: val };
-                                      setEditingProduct({ ...editingProduct, packagingVariants: updated });
+                                      setLiterFormState({ ...literFormState, packagingVariants: updated });
                                     }}
                                     prefix="Rp"
                                     className="bg-white font-black text-emerald-900"
@@ -3543,8 +3814,8 @@ export const InventoryPage: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const updated = editingProduct.packagingVariants?.filter((_, i) => i !== vIdx);
-                                      setEditingProduct({ ...editingProduct, packagingVariants: updated });
+                                      const updated = literFormState.packagingVariants?.filter((_, i) => i !== vIdx);
+                                      setLiterFormState({ ...literFormState, packagingVariants: updated });
                                     }}
                                     className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg border border-red-200 transition"
                                     title="Hapus varian"
@@ -3566,45 +3837,50 @@ export const InventoryPage: React.FC = () => {
                 );
               })()}
 
-              {/* GENERAL ALERT THRESHOLD FOR NON-PCS/LITER TYPES */}
-              {productType !== 'pcs' && productType !== 'liter' && (
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">
-                    Batas Peringatan Stok Menipis (Warning Alert):
-                  </label>
-                  <FormattedNumberInput
-                    value={editingProduct.minStockAlert}
-                    onChange={(val) => setEditingProduct({ ...editingProduct, minStockAlert: val })}
-                    allowDecimal={editingProduct.isWeighable || editingProduct.baseUnit === 'kg'}
-                    suffix={editingProduct.baseUnit}
-                    placeholder="10"
-                    className="bg-slate-50"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    Sistem memberikan peringatan visual di kasir jika stok &le; {editingProduct.minStockAlert || 10} {editingProduct.baseUnit}
-                  </p>
-                </div>
-              )}
+              {/* GENERAL ALERT THRESHOLD */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Batas Peringatan Stok Menipis (Warning Alert):
+                </label>
+                <FormattedNumberInput
+                  value={formCommon.minStockAlert}
+                  onChange={(val) => setFormCommon({ ...formCommon, minStockAlert: val })}
+                  allowDecimal={productType === 'kg' || productType === 'liter'}
+                  suffix={productType === 'kg' ? 'kg' : productType === 'liter' ? 'liter' : 'pcs'}
+                  placeholder=""
+                  className="bg-slate-50"
+                />
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Sistem memberikan peringatan visual di kasir jika stok &le; {formCommon.minStockAlert || 0}
+                </p>
+              </div>
 
-            </div>
+              </div>
+            )}
 
             {/* MODAL FOOTER */}
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-2.5">
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2.5">
               <button
                 type="button"
                 onClick={() => setIsEditModalOpen(false)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-100 transition"
+                className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-100 transition"
               >
                 Batal
               </button>
-              <button
-                type="button"
-                onClick={handleSaveProductForm}
-                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs transition active:scale-95 flex items-center justify-center gap-1.5"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Simpan Produk</span>
-              </button>
+              {productType ? (
+                <button
+                  type="button"
+                  onClick={handleSaveProductForm}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs transition active:scale-95 flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Simpan Data Produk</span>
+                </button>
+              ) : (
+                <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                  Pilih Tipe Produk di Atas
+                </span>
+              )}
             </div>
 
           </div>

@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
 import { formatNumberWithDots } from '../utils/numberFormat';
+import { formatVariantDisplayName, getVariantDetailSubtext, formatCartItemTitle } from '../utils/variantFormat';
 
 export const POSPage: React.FC = () => {
   const { 
@@ -756,10 +757,10 @@ export const POSPage: React.FC = () => {
         <div className="lg:col-span-7 xl:col-span-8 space-y-4">
           
           {/* Top Control Bar with Keyboard Shortcut Hints */}
-          <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap sm:flex-nowrap items-center gap-2">
+          <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap sm:flex-nowrap items-center gap-2">
             
-            {/* Search Input with Auto-Focus, Voice-to-Text Button, and Multiplier Support */}
-            <div className="relative flex-1 min-w-[200px]">
+            {/* Search Input with Auto-Focus and Multiplier Support */}
+            <div className="relative flex-1 min-w-[180px]">
               {isListeningVoice ? (
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-red-500 animate-pulse">
                   <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
@@ -774,22 +775,22 @@ export const POSPage: React.FC = () => {
                 type="text"
                 placeholder={
                   isListeningVoice
-                    ? '🎤 Mendengarkan suara Anda... (contoh: "Beras Ramos", "Minyak Sunco")'
-                    : 'Cari barang / SKU (Contoh: 3*Minyak atau tekan F7 untuk bicara)...'
+                    ? '🎤 Mendengarkan suara Anda...'
+                    : 'Cari barang / SKU (misal: 3*Minyak)...'
                 }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
                 className={`w-full ${
-                  isListeningVoice ? 'pl-11' : 'pl-9'
-                } pr-28 py-2 border rounded-xl text-xs sm:text-sm font-medium focus:outline-hidden transition ${
+                  isListeningVoice ? 'pl-10' : 'pl-9'
+                } pr-14 py-2 border rounded-xl text-xs sm:text-sm font-medium focus:outline-hidden transition ${
                   isListeningVoice
                     ? 'bg-red-50/30 border-red-400 ring-2 ring-red-400/70 text-slate-900 shadow-xs'
                     : 'bg-slate-50 border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:bg-white'
                 }`}
               />
 
-              {/* Right Controls inside search input: Clear + Voice Search Button + Shortcut Badge */}
+              {/* Right Controls inside search input: Clear + Shortcut Badge */}
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                 {searchQuery && (
                   <button
@@ -805,26 +806,8 @@ export const POSPage: React.FC = () => {
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
-
-                {/* Inline Microphone Voice Search Trigger */}
-                <button
-                  type="button"
-                  onClick={toggleVoiceRecognition}
-                  className={`p-1.5 rounded-lg transition-all flex items-center gap-1 ${
-                    isListeningVoice
-                      ? 'bg-red-500 text-white animate-pulse shadow-xs ring-2 ring-red-300'
-                      : 'text-slate-400 hover:text-emerald-700 hover:bg-slate-200/80'
-                  }`}
-                  title={isListeningVoice ? 'Hentikan pencarian suara (F7)' : 'Cari barang dengan suara (F7)'}
-                >
-                  {isListeningVoice ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-                  <span className="text-[10px] font-bold hidden md:inline">
-                    {isListeningVoice ? 'Mendengarkan' : 'Suara'}
-                  </span>
-                </button>
-
                 <span className="text-[10px] font-mono bg-slate-200/80 text-slate-600 px-1.5 py-0.5 rounded hidden sm:inline">
-                  F2 / F7
+                  F2
                 </span>
               </div>
             </div>
@@ -832,17 +815,17 @@ export const POSPage: React.FC = () => {
             {/* Camera Barcode Scanner Button */}
             <button
               onClick={() => setIsScannerOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition active:scale-95 shrink-0"
+              className="flex items-center gap-1.5 px-2.5 py-2 sm:px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition active:scale-95 shrink-0"
               title="Buka Kamera Barcode Scanner"
             >
               <Camera className="w-4 h-4 text-emerald-600" />
-              <span className="hidden sm:inline">Scan</span>
+              <span className="text-xs">Scan</span>
             </button>
 
             {/* Voice Search Toolbar Button */}
             <button
               onClick={toggleVoiceRecognition}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 shrink-0 ${
+              className={`flex items-center gap-1.5 px-2.5 py-2 sm:px-3 rounded-xl text-xs font-bold transition active:scale-95 shrink-0 ${
                 isListeningVoice
                   ? 'bg-red-500 text-white animate-pulse shadow-md ring-2 ring-red-300'
                   : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
@@ -850,15 +833,14 @@ export const POSPage: React.FC = () => {
               title="Cari Produk dengan Suara (F7)"
             >
               {isListeningVoice ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4 text-emerald-600" />}
-              <span className="hidden sm:inline">{isListeningVoice ? 'Mendengarkan...' : 'Cari Suara (F7)'}</span>
-              <span className="sm:hidden">{isListeningVoice ? 'Stop' : 'Voice'}</span>
+              <span className="text-xs">{isListeningVoice ? 'Stop' : 'Suara (F7)'}</span>
             </button>
 
             {/* Quick Add Top-Selling Toggle Button */}
             <button
               type="button"
               onClick={() => setShowQuickAdd((prev) => !prev)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 shrink-0 ${
+              className={`flex items-center gap-1.5 px-2.5 py-2 sm:px-3 rounded-xl text-xs font-bold transition active:scale-95 shrink-0 ${
                 showQuickAdd
                   ? 'bg-amber-500 text-white shadow-xs shadow-amber-200'
                   : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200'
@@ -866,8 +848,8 @@ export const POSPage: React.FC = () => {
               title="Toggle Panel Quick Add / Item Terlaris (F4)"
             >
               <Zap className={`w-4 h-4 ${showQuickAdd ? 'text-white fill-white' : 'text-amber-600 fill-amber-500'}`} />
-              <span className="font-extrabold hidden sm:inline">Quick Add</span>
-              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-black ${
+              <span className="font-extrabold text-xs">Quick Add</span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-black ${
                 showQuickAdd ? 'bg-amber-600 text-white' : 'bg-amber-200/90 text-amber-900'
               }`}>
                 {topSellingProducts.length}
@@ -1058,7 +1040,7 @@ export const POSPage: React.FC = () => {
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
             <button
               onClick={() => setSelectedCategory('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition ${
+              className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
                 selectedCategory === 'all'
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
@@ -1070,7 +1052,7 @@ export const POSPage: React.FC = () => {
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition ${
+                className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
                   selectedCategory === cat
                     ? 'bg-emerald-600 text-white shadow-xs'
                     : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
@@ -1082,11 +1064,11 @@ export const POSPage: React.FC = () => {
           </div>
 
           {/* Product Catalog Grid with Arrow Key Highlight & Uniform Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3.5">
             {filteredProducts.map((product, index) => {
               const isWeightedProduct = product.baseUnit === 'kg' || product.isWeighable || Boolean(product.hargaJualKg);
               const availableUnits = storage.getAvailableUnitsForProduct(product);
-              const defaultUnit = isWeightedProduct ? '1 KG' : (availableUnits[0]?.unit || product.baseUnit);
+              const defaultUnit = availableUnits[0]?.unit || (isWeightedProduct ? '1 KG' : product.baseUnit);
               const activeUnit = productSelectedUnits[product.id] || defaultUnit;
               const matchedUnitConfig = availableUnits.find(
                 (u) => 
@@ -1115,7 +1097,22 @@ export const POSPage: React.FC = () => {
               return (
                 <div
                   key={product.id}
-                  onClick={() => setHighlightedIndex(index)}
+                  onClick={() => {
+                    setHighlightedIndex(index);
+                    const hasMultipleVariants = Boolean(
+                      availableUnits.length > 1 ||
+                      (product.packagingVariants && product.packagingVariants.length > 0) ||
+                      (product.tierConfig && (product.tierConfig.tier2Name || product.tierConfig.tier3Name)) ||
+                      Boolean(product.rasioRencengPerDus) ||
+                      Boolean(product.hargaJualDus) ||
+                      Boolean(product.hargaJualRenceng) ||
+                      product.productType === 'box' ||
+                      product.productType === 'kg'
+                    );
+                    if (hasMultipleVariants) {
+                      handleOpenVariantModal(product);
+                    }
+                  }}
                   className={`bg-white rounded-2xl border p-3 sm:p-3.5 flex flex-col justify-between h-full shadow-xs hover:shadow-md transition-all relative overflow-hidden select-none cursor-pointer group ${
                     isHighlighted ? 'ring-2 ring-emerald-500 border-emerald-500 shadow-md bg-emerald-50/10' : ''
                   } ${
@@ -1138,11 +1135,11 @@ export const POSPage: React.FC = () => {
                         </span>
                       ) : isLowStock ? (
                         <span className="text-[10px] font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
-                          Sisa {product.stock} {product.baseUnit}
+                          Sisa {availableStockInActiveUnit.toLocaleString('id-ID')} {matchedUnitConfig.unit}
                         </span>
                       ) : (
                         <span className="text-[10px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                          Stok: {product.stock} {product.baseUnit}
+                          Stok: {availableStockInActiveUnit.toLocaleString('id-ID')} {matchedUnitConfig.unit}
                         </span>
                       )}
                     </div>
@@ -1170,13 +1167,8 @@ export const POSPage: React.FC = () => {
                           <span className="text-emerald-700 font-black uppercase">{matchedUnitConfig.unit}</span>
                         </div>
 
-                        {/* Responsive Segmented Unit Selector Grid */}
-                        <div className={`grid ${
-                          availableUnits.length === 2 ? 'grid-cols-2' :
-                          availableUnits.length === 3 ? 'grid-cols-3' :
-                          availableUnits.length === 4 ? 'grid-cols-4' :
-                          'grid-cols-3 sm:grid-cols-4'
-                        } gap-1 p-0.5 bg-slate-100/90 rounded-xl border border-slate-200/90`}>
+                        {/* Responsive Flex Unit Selector Pills */}
+                        <div className="flex flex-wrap gap-1 p-1 bg-slate-100/90 rounded-xl border border-slate-200/90">
                           {availableUnits.map((u, uIdx) => {
                             const isSelected = 
                               activeUnit === (u.variantId || u.unit) ||
@@ -1269,26 +1261,51 @@ export const POSPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* + Keranjang Button (Uniform & Aligned at bottom of every card) */}
-                    <button
-                      type="button"
-                      disabled={isOutOfStock}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const isCustom = activeUnit.toLowerCase() === 'custom' || activeUnit.toLowerCase() === 'kg' || activeUnit.toLowerCase() === 'liter';
-                        const qtyToAdd = isCustom ? customQty : 1;
-                        const unitToAdd = isCustom ? product.baseUnit : matchedUnitConfig.unit;
-                        handleAddToCart(product, unitToAdd, qtyToAdd, matchedUnitConfig.variantId);
-                      }}
-                      className={`w-full py-2.5 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95 shadow-xs ${
-                        isOutOfStock
-                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                          : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
-                      }`}
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                      <span>+ Keranjang ({activeUnit.toLowerCase() === 'custom' ? `${customQty} ${product.baseUnit}` : matchedUnitConfig.unit})</span>
-                    </button>
+                    {/* + Keranjang / Pilih Varian Button */}
+                    {(() => {
+                      const hasMultipleVariants = Boolean(
+                        availableUnits.length > 1 ||
+                        (product.packagingVariants && product.packagingVariants.length > 0) ||
+                        (product.tierConfig && (product.tierConfig.tier2Name || product.tierConfig.tier3Name)) ||
+                        Boolean(product.rasioRencengPerDus) ||
+                        Boolean(product.hargaJualDus) ||
+                        Boolean(product.hargaJualRenceng) ||
+                        product.productType === 'box' ||
+                        product.productType === 'kg'
+                      );
+
+                      return (
+                        <button
+                          type="button"
+                          disabled={isOutOfStock}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (hasMultipleVariants) {
+                              handleOpenVariantModal(product);
+                            } else {
+                              const isCustom = activeUnit.toLowerCase() === 'custom' || activeUnit.toLowerCase() === 'kg' || activeUnit.toLowerCase() === 'liter';
+                              const qtyToAdd = isCustom ? customQty : 1;
+                              const unitToAdd = isCustom ? product.baseUnit : matchedUnitConfig.unit;
+                              handleAddToCart(product, unitToAdd, qtyToAdd, matchedUnitConfig.variantId);
+                            }
+                          }}
+                          className={`w-full py-2.5 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95 shadow-xs ${
+                            isOutOfStock
+                              ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                              : hasMultipleVariants
+                              ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20'
+                              : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+                          }`}
+                        >
+                          <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                          <span>
+                            {hasMultipleVariants 
+                              ? '+ Pilih Varian' 
+                              : `+ Keranjang (${activeUnit.toLowerCase() === 'custom' ? `${customQty} ${product.baseUnit}` : matchedUnitConfig.unit})`}
+                          </span>
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               );
@@ -1375,7 +1392,9 @@ export const POSPage: React.FC = () => {
                     <div className="flex justify-between items-start gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <div className="font-bold text-slate-900 line-clamp-1">{item.productName}</div>
+                          <div className="font-bold text-slate-900 line-clamp-1">
+                            {formatCartItemTitle(item, parentProd)}
+                          </div>
                           {isJustAdded && (
                             <span className="text-[9px] font-black bg-emerald-600 text-white px-1.5 py-0.2 rounded shrink-0 animate-in fade-in zoom-in duration-200">
                               Baru Masuk
@@ -1390,7 +1409,7 @@ export const POSPage: React.FC = () => {
                             </span>
                           ) : item.unitMultiplier > 1 ? (
                             <span className="text-[10px] bg-amber-50 text-amber-800 px-1.5 py-0.2 rounded font-bold border border-amber-200">
-                              Potong {item.baseQuantity} Pcs
+                              Potong {item.baseQuantity} Pcs ({item.quantity} × {item.unitMultiplier} Pcs)
                             </span>
                           ) : null}
                         </div>
@@ -1615,7 +1634,9 @@ export const POSPage: React.FC = () => {
                   >
                     <div className="flex justify-between items-start gap-2">
                       <div className="flex-1 min-w-0">
-                        <div className="font-bold text-slate-900 line-clamp-1">{item.productName}</div>
+                        <div className="font-bold text-slate-900 line-clamp-1">
+                          {formatCartItemTitle(item, parentProd)}
+                        </div>
                         <div className="text-[11px] text-slate-500 mt-0.5">
                           Rp {item.unitPrice.toLocaleString('id-ID')} / {item.selectedUnit}
                         </div>
@@ -1781,7 +1802,7 @@ export const POSPage: React.FC = () => {
                         }
                       }}
                       className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-base font-black focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
-                      placeholder="0"
+                      placeholder=""
                     />
                   </div>
 
@@ -1856,7 +1877,7 @@ export const POSPage: React.FC = () => {
                       type="text"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="Contoh: Bu Siti"
+                      placeholder=""
                       className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-amber-500"
                     />
                   </div>
@@ -1936,15 +1957,32 @@ export const POSPage: React.FC = () => {
               <div className="space-y-2">
                 {storage.getAvailableUnitsForProduct(selectedVariantProduct).map((opt, idx) => {
                   const qty = variantQuantities[opt.variantId || opt.unit] || 0;
+                  const modalDisplayName = formatVariantDisplayName(
+                    selectedVariantProduct,
+                    { name: opt.variantName || opt.unit, ratio: opt.ratio },
+                    { style: 'isi' }
+                  );
+                  const detailSubtext = getVariantDetailSubtext(selectedVariantProduct, {
+                    name: opt.variantName || opt.unit,
+                    ratio: opt.ratio,
+                  });
+
                   return (
                     <div key={`${selectedVariantProduct.id}-${opt.variantId || opt.unit}-${idx}`} className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
                       <div className="flex-1">
                         <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
                           <span className="w-5 h-5 flex items-center justify-center bg-slate-200 rounded text-[10px] font-black">{idx + 1}</span>
-                          {opt.label}
+                          <span>{modalDisplayName}</span>
                         </div>
-                        <div className="text-xs text-emerald-700 font-semibold mt-0.5">
-                          Rp {opt.price.toLocaleString('id-ID')}
+                        <div className="flex flex-wrap items-center gap-2 text-xs mt-1">
+                          <span className="text-emerald-700 font-bold">
+                            Rp {opt.price.toLocaleString('id-ID')}
+                          </span>
+                          {detailSubtext && (
+                            <span className="text-[10px] text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-md font-bold border border-amber-200">
+                              {detailSubtext}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

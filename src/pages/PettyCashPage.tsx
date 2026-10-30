@@ -289,7 +289,7 @@ export const PettyCashPage: React.FC = () => {
                   value={amount}
                   onChange={(val) => setAmount(val)}
                   prefix="Rp"
-                  placeholder="0"
+                  placeholder=""
                   className="bg-white"
                   inputClassName="text-base font-black py-2.5"
                 />
@@ -302,7 +302,7 @@ export const PettyCashPage: React.FC = () => {
                   type="text"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Contoh: Beli token listrik toko Rp 50.000"
+                  placeholder=""
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs"
                 />
               </div>

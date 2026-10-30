@@ -11,12 +11,12 @@ import {
   CartItem
 } from '../types';
 import { 
-  INITIAL_PRODUCTS, 
   DEFAULT_CATEGORIES, 
   INITIAL_USERS, 
   INITIAL_SETTINGS 
 } from './seedData';
 import { syncDocToFirestore, deleteDocFromFirestore } from './firebase';
+import { formatVariantDisplayName } from '../utils/variantFormat';
 import * as XLSX from 'xlsx';
 
 const STORAGE_KEYS = {
@@ -41,49 +41,8 @@ class StorageService {
   public ensureInitialized() {
     if (typeof window === 'undefined') return;
 
-    const existingProducts = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
-    if (!existingProducts) {
-      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(INITIAL_PRODUCTS));
-    } else {
-      try {
-        const parsed: Product[] = JSON.parse(existingProducts);
-        let updated = false;
-        INITIAL_PRODUCTS.forEach((initProd) => {
-          const match = parsed.find((p) => p.id === initProd.id);
-          if (match && initProd.packagingVariants && (!match.packagingVariants || match.packagingVariants.length === 0)) {
-            match.packagingVariants = initProd.packagingVariants;
-            if (initProd.id === 'prod-001' && (!match.stock || match.stock < 100)) {
-              match.stock = 100;
-            }
-            updated = true;
-          }
-          if (match && initProd.rasioRencengPerDus && !match.rasioRencengPerDus) {
-            match.rasioRencengPerDus = initProd.rasioRencengPerDus;
-            match.rasioPcsPerRenceng = initProd.rasioPcsPerRenceng;
-            match.hargaJualDus = initProd.hargaJualDus;
-            match.hargaJualRenceng = initProd.hargaJualRenceng;
-            match.hargaJualPcs = initProd.hargaJualPcs;
-            match.baseUnit = initProd.baseUnit;
-            match.stock = initProd.stock;
-            match.priceBase = initProd.priceBase;
-            match.costBase = initProd.costBase;
-            match.tierConfig = initProd.tierConfig;
-            updated = true;
-          }
-          if (match && initProd.hargaJualKg && !match.hargaJualKg) {
-            match.hargaJualKg = initProd.hargaJualKg;
-            match.hargaJualGram500 = initProd.hargaJualGram500;
-            match.hargaJualGram250 = initProd.hargaJualGram250;
-            match.hargaJualGram100 = initProd.hargaJualGram100;
-            updated = true;
-          }
-        });
-        if (updated) {
-          localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(parsed));
-        }
-      } catch {
-        // ignore
-      }
+    if (!localStorage.getItem(STORAGE_KEYS.PRODUCTS)) {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.CATEGORIES)) {
       localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(DEFAULT_CATEGORIES));
@@ -153,9 +112,9 @@ class StorageService {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
       const parsed = data ? JSON.parse(data) : null;
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_PRODUCTS;
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return INITIAL_PRODUCTS;
+      return [];
     }
   }
 
@@ -182,23 +141,66 @@ class StorageService {
     deleteDocFromFirestore('products', id);
   }
 
-  public resetToDefaults() {
+  public async resetToDefaults() {
     if (typeof window === 'undefined') return;
-    Object.values(STORAGE_KEYS).forEach((key) => {
-      localStorage.removeItem(key);
-    });
-    this.ensureInitialized();
+
+    // 1. Clear LocalStorage & SessionStorage
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch {
+      // ignore
+    }
+
+    // 2. Set reset done flag to prevent re-seeding demo data
+    localStorage.setItem('pandir_is_reset_done', 'true');
+
+    // 3. Clear IndexedDB caches if supported
+    if (typeof window !== 'undefined' && window.indexedDB) {
+      try {
+        const dbs = await window.indexedDB.databases?.();
+        if (dbs) {
+          for (const dbInfo of dbs) {
+            if (dbInfo.name) {
+              window.indexedDB.deleteDatabase(dbInfo.name);
+            }
+          }
+        }
+      } catch {
+        // Ignore IndexedDB deletion errors
+      }
+    }
+
+    // 4. Initialize clean empty storage structures
+    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(INITIAL_SETTINGS));
+    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.DEBTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.PETTY_CASH, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.CLOSING_REPORTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.CAPITAL_LOGS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.STOCK_LOGS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify([]));
+
     window.dispatchEvent(new CustomEvent('pandir_data_updated', { detail: { key: 'reset' } }));
   }
 
   // --- CATEGORIES ---
   public getCategories(): string[] {
     try {
+      const isResetDone = localStorage.getItem('pandir_is_reset_done') === 'true';
       const data = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
       const parsed = data ? JSON.parse(data) : null;
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_CATEGORIES;
+      if (Array.isArray(parsed)) {
+        if (parsed.length > 0 || isResetDone) {
+          return parsed;
+        }
+      }
+      return isResetDone ? [] : DEFAULT_CATEGORIES;
     } catch {
-      return DEFAULT_CATEGORIES;
+      return [];
     }
   }
 
@@ -465,14 +467,15 @@ class StorageService {
       product.packagingVariants.forEach((v) => {
         const ratio = v.ratioToBase > 0 ? v.ratioToBase : 1;
         const cost = v.costPrice || Math.round((product.costBase || 0) * ratio);
+        const displayName = formatVariantDisplayName(product, { name: v.name, ratioToBase: ratio }, { style: 'short' });
         options.push({
-          unit: v.name,
+          unit: displayName,
           ratio: ratio,
           price: v.sellingPrice || 0,
           cost: cost,
-          label: `${v.name} (Rp ${(v.sellingPrice || 0).toLocaleString('id-ID')})`,
+          label: `${displayName} (Rp ${(v.sellingPrice || 0).toLocaleString('id-ID')})`,
           variantId: v.id,
-          variantName: v.name,
+          variantName: displayName,
           isVariant: true,
         });
       });
@@ -537,13 +540,57 @@ class StorageService {
 
     // 3. Multi-Price Variants & Conversion for Weighted Items (KG / Grams)
     if (product.baseUnit === 'kg' || product.isWeighable || product.hargaJualKg) {
-      const priceKg = product.hargaJualKg ?? product.priceBase ?? 0;
+      let priceKg = product.hargaJualKg ?? product.priceBase ?? 0;
+      const costKg = product.costBase || 0;
+
+      // If priceKg is 0 or empty, but packagingVariants exist, derive priceKg from variants
+      if (priceKg <= 0 && product.packagingVariants && product.packagingVariants.length > 0) {
+        const oneKgVar = product.packagingVariants.find(v => Math.abs(v.ratioToBase - 1) < 0.0001 || v.name.toLowerCase().includes('1 kg'));
+        if (oneKgVar && oneKgVar.sellingPrice > 0) {
+          priceKg = oneKgVar.sellingPrice;
+        } else {
+          const first = product.packagingVariants[0];
+          if (first && first.ratioToBase > 0 && first.sellingPrice > 0) {
+            priceKg = Math.round(first.sellingPrice / first.ratioToBase);
+          }
+        }
+      }
+
       const price500 = product.hargaJualGram500 ?? Math.round((priceKg * 0.5) / 100) * 100;
       const price250 = product.hargaJualGram250 ?? Math.round((priceKg * 0.25) / 100) * 100;
       const price100 = product.hargaJualGram100 ?? Math.round((priceKg * 0.1) / 100) * 100;
-      const costKg = product.costBase || 0;
 
-      const kgOptions = [
+      const kgOptions: { 
+        unit: string; 
+        ratio: number; 
+        price: number; 
+        cost: number; 
+        label: string;
+        variantId?: string;
+        variantName?: string;
+        isVariant?: boolean;
+      }[] = [];
+
+      // First add custom/packaging variants if any
+      if (product.packagingVariants && product.packagingVariants.length > 0) {
+        product.packagingVariants.forEach((v) => {
+          const ratio = v.ratioToBase > 0 ? v.ratioToBase : 1;
+          const cost = v.costPrice || Math.round(costKg * ratio);
+          kgOptions.push({
+            unit: v.name,
+            ratio: ratio,
+            price: v.sellingPrice || 0,
+            cost: cost,
+            label: `${v.name} (Rp ${(v.sellingPrice || 0).toLocaleString('id-ID')})`,
+            variantId: v.id,
+            variantName: v.name,
+            isVariant: true,
+          });
+        });
+      }
+
+      // Also add standard weighing options (1 KG, 500g, 250g, 100g, Custom KG)
+      kgOptions.push(
         {
           unit: '1 KG',
           ratio: 1.0,
@@ -578,8 +625,8 @@ class StorageService {
           price: priceKg,
           cost: costKg,
           label: `Custom KG (Rp ${priceKg.toLocaleString('id-ID')}/kg)`,
-        },
-      ];
+        }
+      );
 
       // Wholesale Karung / Sack tier option if present
       if (product.tierConfig?.tier3Name && product.tierConfig?.tier3Ratio) {
@@ -702,7 +749,7 @@ class StorageService {
       const selNorm = selectedUnit.toLowerCase().replace(/\s+/g, '');
       const unitNorm = u.unit.toLowerCase().replace(/\s+/g, '');
       if (selNorm === unitNorm) return true;
-      if (u.variantId && u.variantId.toLowerCase() === selNorm) return true;
+      if (unitNorm.startsWith(selNorm) || selNorm.startsWith(unitNorm)) return true;
       if ((selNorm === '1kg' || selNorm === 'kg') && (unitNorm === '1kg' || unitNorm === 'kg')) return true;
       if ((selNorm === '1liter' || selNorm === 'liter') && (unitNorm === '1liter' || unitNorm === 'liter')) return true;
       return false;

@@ -168,7 +168,7 @@ export const ClosingPage: React.FC = () => {
                 value={physicalCash}
                 onChange={(val) => setPhysicalCash(val)}
                 prefix="Rp"
-                placeholder="0"
+                placeholder=""
                 className="bg-white"
                 inputClassName="text-xl font-black py-2.5"
               />
@@ -209,7 +209,7 @@ export const ClosingPage: React.FC = () => {
               <textarea
                 value={cashierNotes}
                 onChange={(e) => setCashierNotes(e.target.value)}
-                placeholder="Contoh: Uang koin pecahan Rp 500 belum dihitung semua / shift lancar."
+                placeholder=""
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs h-20 resize-none"
               />
             </div>

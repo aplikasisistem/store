@@ -539,7 +539,7 @@ export const FinancePage: React.FC = () => {
                   value={capitalAmount}
                   onChange={(val) => setCapitalAmount(val)}
                   prefix="Rp"
-                  placeholder="0"
+                  placeholder=""
                   className="bg-white"
                   inputClassName="text-base font-black py-2"
                 />
@@ -551,7 +551,7 @@ export const FinancePage: React.FC = () => {
                   type="text"
                   value={capitalDesc}
                   onChange={(e) => setCapitalDesc(e.target.value)}
-                  placeholder="Contoh: Modal awal kasir shift pagi / modal belanja beras"
+                  placeholder=""
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
                 />
               </div>
